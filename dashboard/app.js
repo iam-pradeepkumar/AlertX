@@ -420,9 +420,12 @@ async function startFeed() {
     const imagePlayback = document.getElementById('image-playback');
     if (imagePlayback) imagePlayback.classList.add('hidden');
 
-    // ── STRATEGY 1: Try server-side camera (works locally) ──
+    // ── STRATEGY 1: Try server-side camera (works locally or with remote URL) ──
     try {
-        await apiRequest('/camera/start', 'POST', null, true);
+        const source = document.getElementById('cam-source').value || "0";
+        console.log(`AlertX: Attempting to start camera with source: ${source}`);
+        
+        await apiRequest(`/camera/start?source=${encodeURIComponent(source)}`, 'POST', null, true);
         
         // Server camera worked — use MJPEG stream
         const authData = await apiRequest('/auth/stream-token', 'POST', null, true);
