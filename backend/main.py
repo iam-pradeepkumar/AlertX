@@ -271,9 +271,9 @@ def _live_processing_loop():
             time.sleep(0.01)
             continue
 
-        # LAG FIX: Skip frames if we are behind
-        # During heavy action/crowds, only detect every 10th frame if system is hot
-        skip_factor = 10 if _is_processing_incident else 5
+        # LAG FIX: Drastic skipping for Hugging Face Free Tier
+        # We only detect every 10-20 frames to ensure zero backlog lag
+        skip_factor = 20 if _is_processing_incident else 10
         
         if frame_idx % skip_factor == 0:
             try:
@@ -321,13 +321,13 @@ def _get_latest_frame():
     if _last_encoded_frame_id == _last_frame_id and _latest_encoded_frame is not None:
         return _latest_encoded_frame
         
-    # Downscale and compress
+    # Downscale and compress even more for cloud speed
     out = _latest_annotated_frame
     h, w = out.shape[:2]
-    new_w = 480
-    new_h = int(h * (480 / w))
+    new_w = 400
+    new_h = int(h * (400 / w))
     small_frame = cv2.resize(out, (new_w, new_h), interpolation=cv2.INTER_AREA)
-    _, buffer = cv2.imencode(".jpg", small_frame, [cv2.IMWRITE_JPEG_QUALITY, 35])
+    _, buffer = cv2.imencode(".jpg", small_frame, [cv2.IMWRITE_JPEG_QUALITY, 20])
     
     _latest_encoded_frame = buffer.tobytes()
     _last_encoded_frame_id = _last_frame_id

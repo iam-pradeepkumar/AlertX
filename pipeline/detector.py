@@ -94,6 +94,10 @@ class YOLODetector:
         result = FrameResult()
         t0 = time.time()
         
+        # --- OPTIMIZATION: Ultra-low resolution for cloud ---
+        # Resizing here makes everything below (contrast, AI) 4x faster
+        frame = cv2.resize(frame, (320, 240), interpolation=cv2.INTER_AREA)
+
         # --- LIGHT PRE-PROCESSING (Handling watermarks efficiently) ---
         # Contrast boost is cheap (fast), Sharpening is expensive (slow).
         alpha = 1.2 # Contrast
