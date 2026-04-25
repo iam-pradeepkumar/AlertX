@@ -497,88 +497,95 @@ async function startFeed() {
         const ctx = canvas.getContext('2d');
 
         browserCam.srcObject = browserStream;
-        browserCam.classList.remove('hidden');
+        const overlay = document.getElementById('overlay-canvas');
+        const overlayCtx = overlay.getContext('2d');
+        const camContainer = document.getElementById('browser-cam-container');
+        
+        camContainer.classList.remove('hidden');
         feed.classList.add('hidden');
         placeholder.classList.add('hidden');
 
         // Robust wait for video metadata
         if (browserCam.readyState >= 2) {
-            console.log("AlertX: Browser camera metadata already available.");
-            canvas.width = browserCam.videoWidth;
-            canvas.height = browserCam.videoHeight;
+            canvas.width = 640; // Detection resolution
+            canvas.height = 480;
+            overlay.width = browserCam.videoWidth;
+            overlay.height = browserCam.videoHeight;
         } else {
-            console.log("AlertX: Waiting for browser camera metadata...");
             await new Promise((resolve) => {
                 browserCam.onloadedmetadata = () => {
-                    canvas.width = browserCam.videoWidth;
-                    canvas.height = browserCam.videoHeight;
+                    canvas.width = 640;
+                    canvas.height = 480;
+                    overlay.width = browserCam.videoWidth;
+                    overlay.height = browserCam.videoHeight;
                     resolve();
                 };
             });
         }
 
         await browserCam.play();
-        console.log("AlertX: Browser camera playback started.");
-
         isLive = true;
         isBrowserCamMode = true;
         btn.textContent = "Browser Cam Live";
         btn.disabled = false;
 
-        // Frame capture loop — send frames to server for YOLO processing
         let isProcessing = false;
-        console.log("AlertX: Starting frame processing loop in 1s...");
         
-        // Small delay to let the model settle on the server
         setTimeout(() => {
             browserCamInterval = setInterval(async () => {
             if (!isLive || !isBrowserCamMode || isProcessing) return;
 
             isProcessing = true;
             try {
-                // Capture frame from video
+                // Capture frame for AI (scaled down to 640px for speed)
                 ctx.drawImage(browserCam, 0, 0, canvas.width, canvas.height);
-                
-                // Convert to JPEG blob
-                const blob = await new Promise(resolve => canvas.toBlob(resolve, 'image/jpeg', 0.7));
+                const blob = await new Promise(resolve => canvas.toBlob(resolve, 'image/jpeg', 0.6));
                 if (!blob) { isProcessing = false; return; }
 
-                // Send to server for YOLO processing
                 const formData = new FormData();
                 formData.append('file', blob, 'frame.jpg');
 
-                const processUrl = `${API_BASE}/process_frame`;
-                const response = await fetch(processUrl, {
+                const response = await fetch(`${API_BASE}/process_frame`, {
                     method: 'POST',
                     headers: { 'Authorization': `Bearer ${token}` },
                     body: formData
                 });
 
-                if (!response.ok) {
-                    console.error('AlertX: Frame processing failed with status:', response.status);
-                    throw new Error('Frame processing failed');
+                if (!response.ok) throw new Error('AI Sync Failed');
+                const data = await response.json();
+
+                // ── DRAW BOXES (Client Side) ──
+                overlayCtx.clearRect(0, 0, overlay.width, overlay.height);
+                
+                // Scale factor between detection size (640x480) and display size
+                const scaleX = overlay.width / canvas.width;
+                const scaleY = overlay.height / canvas.height;
+
+                if (data.detections) {
+                    data.detections.forEach(det => {
+                        const [x1, y1, x2, y2] = det.box;
+                        const color = det.type ? "#ff4d4d" : "#00ff88"; // Red for incidents, Green for info
+                        
+                        overlayCtx.strokeStyle = color;
+                        overlayCtx.lineWidth = 3;
+                        overlayCtx.strokeRect(x1 * scaleX, y1 * scaleY, (x2-x1) * scaleX, (y2-y1) * scaleY);
+
+                        overlayCtx.fillStyle = color;
+                        overlayCtx.font = "bold 16px Inter, sans-serif";
+                        overlayCtx.fillText(`${det.label} ${Math.round(det.conf*100)}%`, x1 * scaleX, y1 * scaleY - 10);
+                    });
                 }
 
-                const data = await response.json();
-                console.log("AlertX: Received processed frame, incidents:", data.incidents.length);
-
-                // Display the annotated frame
-                feed.src = `data:image/jpeg;base64,${data.frame}`;
-                feed.classList.remove('hidden');
-                browserCam.classList.add('hidden');
-
-                // Show incident notifications
                 if (data.incidents && data.incidents.length > 0) {
-                    for (const inc of data.incidents) {
-                        const conf = Math.round(inc.confidence * 100);
-                        showToast(`🚨 ${inc.type.toUpperCase()} detected (${conf}%)`, "error");
-                    }
+                    data.incidents.forEach(inc => showToast(`🚨 ${inc.type.toUpperCase()}!`, "error"));
                     updateEvents();
                 }
+            } catch (err) {
+                console.warn("AI Loop Error:", err);
             } finally {
                 isProcessing = false;
             }
-        }, 400); // ~2.5 FPS for stability
+        }, 300); // 3 FPS detection (Video remains 30FPS)
     }, 1000);
 
     showToast("Browser webcam active — AI processing enabled", "success");

@@ -452,8 +452,8 @@ async def upload_video(file: UploadFile = File(...), current_user: str = Depends
 
 @app.post("/process_frame")
 async def process_frame(file: UploadFile = File(...), current_user: str = Depends(get_current_user)):
-    """Process a single frame sent from the browser webcam (Cloud Mode)."""
-    global _latest_annotated_frame, _last_frame_id, _last_activity_time
+    """Process a single frame and return JSON coordinates for client-side drawing."""
+    global _last_activity_time
     
     contents = await file.read()
     nparr = np.frombuffer(contents, np.uint8)
@@ -462,27 +462,33 @@ async def process_frame(file: UploadFile = File(...), current_user: str = Depend
     if frame is None:
         return {"status": "error", "message": "Invalid image"}
         
-    # Update activity time for multi-device sync
     _last_activity_time = time.time()
 
     if not detector._loaded:
         detector.load()
         
+    # INCREASE QUALITY: Detect at 640px for better accuracy
+    # (Since we aren't encoding/sending a frame back, we can afford more AI power)
     result = detector.detect(frame)
-    _latest_annotated_frame = result.annotated_frame
     
-    # Trigger agents if incidents found
     if result.incidents:
         run_agent_pipeline(result, source="browser_cam")
 
-    # Encode result to send back to browser
-    _, buffer = cv2.imencode('.jpg', result.annotated_frame, [cv2.IMWRITE_JPEG_QUALITY, 50])
-    img_str = base64.b64encode(buffer).decode()
-    
+    # Return only the detection data (super lightweight)
+    detections = []
+    for det in result.detections:
+        detections.append({
+            "box": det.bbox, # [x1, y1, x2, y2]
+            "label": det.class_name,
+            "conf": round(det.confidence, 2),
+            "type": det.incident_type
+        })
+        
     return {
         "status": "success",
-        "frame": img_str,
-        "incidents": result.incidents
+        "detections": detections,
+        "incidents": result.incidents,
+        "person_count": result.person_count
     }
 
 
