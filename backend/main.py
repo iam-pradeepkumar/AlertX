@@ -52,6 +52,7 @@ from agents.threat_agent import ThreatAnalysisAgent
 from agents.decision_agent import DecisionAgent
 from agents.alert_agent import AlertAgent
 from agents.learning_agent import LearningAgent
+from agents.violence_agent import ViolenceAgent
 
 # ──────────────────────────────────────────────
 # Logging
@@ -96,6 +97,7 @@ threat_agent = ThreatAnalysisAgent()
 decision_agent = DecisionAgent()
 alert_agent = AlertAgent()
 learning_agent = LearningAgent()
+violence_agent = ViolenceAgent()
 
 _processing_live = False
 _live_thread: Optional[threading.Thread] = None
@@ -235,6 +237,7 @@ def _bg_agent_task(frame_result, source, frame_index, recipient):
         # Run full mission-critical agent chain
         data = detection_agent.process(data)
         data = threat_agent.process(data)
+        data = violence_agent.process(data) # Secondary Scene Validation
         data = decision_agent.process(data) # Restored: This sets the priority!
         data = alert_agent.process(data)
         data = learning_agent.process(data)

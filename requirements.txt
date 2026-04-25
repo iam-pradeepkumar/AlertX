@@ -17,3 +17,8 @@ bcrypt>=4.0.0
 python-jose>=3.3.0
 requests
 yt-dlp
+torch
+torchvision
+ftfy
+regex
+git+https://github.com/openai/CLIP.git
