@@ -421,33 +421,33 @@ async function startFeed() {
     if (imagePlayback) imagePlayback.classList.add('hidden');
 
     // ── STRATEGY 1: Try server-side camera (works locally or with remote URL) ──
-    try {
-        const source = document.getElementById('cam-source').value || "0";
-        console.log(`AlertX: Attempting to start camera with source: ${source}`);
-        
-        await apiRequest(`/camera/start?source=${encodeURIComponent(source)}`, 'POST', null, true);
-        
-        // Server camera worked — use MJPEG stream
-        // OPTIMIZATION: If source is a URL, try to load it directly for zero lag
-        if (source.startsWith('http')) {
-            console.log("AlertX: Using Direct-Stream mode for zero latency.");
-            feed.src = source;
-        } else {
-            feed.src = `/video_feed?ticket=${ticket}&t=${new Date().getTime()}`;
+    const source = document.getElementById('cam-source').value.trim();
+    if (source && source !== "0") {
+        try {
+            console.log(`AlertX: Attempting to start camera with source: ${source}`);
+            await apiRequest(`/camera/start?source=${encodeURIComponent(source)}`, 'POST', null, true);
+            
+            // Server camera worked — use MJPEG stream
+            const authData = await apiRequest('/auth/stream-token', 'POST', null, true);
+            const ticket = authData.ticket;
+
+            if (source.startsWith('http')) {
+                console.log("AlertX: Using Direct-Stream mode for zero latency.");
+                feed.src = source;
+            } else {
+                feed.src = `${API_BASE}/video_feed?ticket=${ticket}&t=${new Date().getTime()}`;
+            }
+
+            feed.classList.remove('hidden');
+            placeholder.classList.add('hidden');
+            isLive = true;
+            isBrowserCamMode = false;
+            feed.onload = () => { btn.textContent = "Node Online"; };
+            showToast("Server camera connected", "success");
+            return;
+        } catch (e) {
+            console.warn("AlertX: Server camera unavailable, trying browser webcam...", e.message);
         }
-        feed.classList.remove('hidden');
-        placeholder.classList.add('hidden');
-        isLive = true;
-        isBrowserCamMode = false;
-        
-        feed.onload = () => {
-            btn.textContent = "Node Online";
-        };
-        
-        showToast("Server camera connected", "success");
-        return;
-    } catch (e) {
-        console.warn("Server camera unavailable, trying browser webcam...", e.message);
     }
 
     // ── STRATEGY 2: Browser webcam fallback (works on cloud) ──
