@@ -46,8 +46,10 @@ class FrameGrabber:
                     'format': 'best[height<=480]/best[height<=720]/best',
                     'quiet': True,
                     'noplaylist': True,
-                    'nocheckcertificate': True, # Bypass SSL errors
-                    'user_agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36'
+                    'nocheckcertificate': True,
+                    'prefer_insecure': True, # Try HTTP if HTTPS fails
+                    'user_agent': 'Mozilla/5.0 (Linux; Android 10; SM-G960F) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.101 Mobile Safari/537.36',
+                    'extractor_args': {'youtube': {'player_client': ['android', 'web']}}
                 }
                 with yt_dlp.YoutubeDL(ydl_opts) as ydl:
                     info = ydl.extract_info(self.source, download=False)
