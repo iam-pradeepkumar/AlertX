@@ -1,0 +1,284 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>AlertX | Enterprise AI Surveillance</title>
+    
+    <!-- Google Fonts -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700;800&family=JetBrains+Mono&display=swap" rel="stylesheet">
+    
+    <!-- Leaflet Maps -->
+    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+    
+    <link rel="stylesheet" href="style.css?v=1.2">
+</head>
+<body>
+    
+    <!-- ── AUTH OVERLAY ─────────────────── -->
+    <div id="auth-overlay" class="overlay active">
+        <div class="auth-card">
+            <div class="logo">
+                <span class="logo__icon">🛡️</span>
+                <span class="logo__text">Alert<span class="text--accent">X</span></span>
+            </div>
+            <h2>System Authentication</h2>
+            <p class="text--secondary">Access restricted to authorized security administrators</p>
+            
+            <form id="login-form" class="mt-2">
+                <div class="form-group">
+                    <label>Admin ID</label>
+                    <input type="text" id="login-user" required placeholder="admin_portal">
+                </div>
+                <div class="form-group">
+                    <label>Access Key</label>
+                    <input type="password" id="login-pass" required placeholder="••••••••">
+                </div>
+                <button type="submit" class="btn btn--primary btn--block">Sign In</button>
+            </form>
+            
+            <div class="mt-1-5">
+                <p style="font-size: 0.85rem; color: var(--text-secondary)">
+                    New node registration? <a href="#" id="show-signup" class="text--accent">Register</a>
+                </p>
+            </div>
+        </div>
+    </div>
+
+    <!-- ── SIGNUP OVERLAY ────────────────── -->
+    <div id="signup-overlay" class="overlay">
+        <div class="auth-card">
+            <div class="logo">
+                <span class="logo__icon">🛡️</span>
+                <span class="logo__text">Alert<span class="text--accent">X</span></span>
+            </div>
+            <h2>Node Registration</h2>
+            <p class="text--secondary">Enroll a new security monitoring administrator</p>
+            <form id="signup-form" class="mt-2">
+                <div class="form-group">
+                    <label>Target Username</label>
+                    <input type="text" id="signup-user" required>
+                </div>
+                <div class="form-group">
+                    <label>Official Email</label>
+                    <input type="email" id="signup-email" required>
+                </div>
+                <div class="form-group">
+                    <label>Node Access Key</label>
+                    <input type="password" id="signup-pass" required minlength="8">
+                </div>
+                <button type="submit" class="btn btn--primary btn--block">Create Node</button>
+            </form>
+            <div class="mt-1-5">
+                <p style="font-size: 0.85rem; color: var(--text-secondary)">
+                    Got access keys? <a href="#" id="show-login" class="text--accent">Login</a>
+                </p>
+            </div>
+        </div>
+    </div>
+
+    <!-- ── MAIN APPLICATION SHELL ────────── -->
+    <div id="app-shell" class="app-shell hidden">
+        
+        <!-- Sidebar Navigation -->
+        <aside class="sidebar">
+            <div class="logo">
+                <span class="logo__icon">🛡️</span>
+                <span class="logo__text">Alert<span class="text--accent">X</span></span>
+            </div>
+            
+            <nav class="sidebar__nav">
+                <a href="#" class="nav-item active" data-view="dashboard">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="7" height="7"/><rect x="14" y="3" width="7" height="7"/><rect x="14" y="14" width="7" height="7"/><rect x="3" y="14" width="7" height="7"/></svg>
+                    <span>Dashboard</span>
+                </a>
+                <a href="#" class="nav-item" data-view="live-map">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z"/><circle cx="12" cy="10" r="3"/></svg>
+                    <span>Geo-Intelligence</span>
+                </a>
+                <a href="#" class="nav-item" data-view="history">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 8v4l3 3m6-3a9 9 0 1 1-9-9 9 9 0 0 1 9 9z"/></svg>
+                    <span>Forensic Archive</span>
+                </a>
+            </nav>
+            
+            <div class="sidebar-footer">
+                <div class="user-profile">
+                    <div class="avatar-box">🛡️</div>
+                    <div class="user-info">
+                        <span id="user-display">Admin</span>
+                        <a href="#" id="btn-logout">Logout</a>
+                    </div>
+                </div>
+            </div>
+        </aside>
+
+        <!-- Primary View Area -->
+        <main class="main-stage">
+            
+            <!-- Dashboard View -->
+            <div id="view-dashboard" class="view active">
+                <header class="view-header">
+                    <div>
+                        <h1>Security Command</h1>
+                        <p id="system-status-msg">All AI nodes operational | Processing @ 30 FPS</p>
+                    </div>
+                    <div class="status-indicator">
+                        <span class="status-dot status-dot--online"></span>
+                        <span id="status-text">Server Sync Active</span>
+                        <button class="btn btn--sm btn--ghost" id="btn-refresh-stats" style="margin-left: 1rem;">🔄</button>
+                    </div>
+                </header>
+
+                <div class="stats-grid">
+                    <div class="stat-card">
+                        <div class="stat-card__icon text--accent">📡</div>
+                        <div class="stat-card__content">
+                            <h3 id="stat-total">0</h3>
+                            <p>Global Detections</p>
+                        </div>
+                    </div>
+                    <div class="stat-card">
+                        <div class="stat-card__icon text--critical">🚨</div>
+                        <div class="stat-card__content">
+                            <h3 id="stat-high">0</h3>
+                            <p>Priority Threats</p>
+                        </div>
+                    </div>
+                    <div class="stat-card">
+                        <div class="stat-card__icon text--online">🛡️</div>
+                        <div class="stat-card__content">
+                            <h3>Active</h3>
+                            <p>Node Integrity</p>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="dashboard-grid">
+                    <!-- Column 1: Stream and Controls -->
+                    <div class="col-main grid">
+                        <!-- Stream Panel -->
+                        <div class="panel">
+                            <div class="panel__header">
+                                <h3>● Live Forensic Stream</h3>
+                                <div style="display: flex; gap: 0.5rem">
+                                    <button class="btn btn--sm btn--primary" id="btn-start">Start Node</button>
+                                    <button class="btn btn--sm btn--ghost" id="btn-stop">Offline</button>
+                                </div>
+                            </div>
+                            <div class="feed-wrapper">
+                                <img id="video-feed" src="" alt="Live" class="hidden">
+                                <video id="video-playback" controls class="hidden" style="width: 100%"></video>
+                                <img id="image-playback" class="hidden" style="width: 100%; border-radius: 8px;">
+                                <div id="feed-placeholder" class="feed-placeholder">
+                                    <div style="font-size: 3rem; opacity: 0.1">📹</div>
+                                    <p class="mt-1">Encrypted Node Standby</p>
+                                </div>
+                                <!-- Browser Webcam Elements (used for cloud deployment) -->
+                                <video id="browser-cam" autoplay playsinline muted class="hidden" style="width:100%;height:100%;object-fit:contain;"></video>
+                                <canvas id="browser-canvas" class="hidden"></canvas>
+                            </div>
+                        </div>
+
+                        <!-- Dispatch Panel -->
+                        <div class="panel">
+                            <div class="panel__header"><h3>AI Emergency Dispatch</h3></div>
+                            <div class="dispatch-grid">
+                                <button class="dispatch-btn" data-service="police">
+                                    <span class="icon">🚓</span>
+                                    <span class="dispatch-btn__label">Police</span>
+                                </button>
+                                <button class="dispatch-btn" data-service="ambulance">
+                                    <span class="icon">🚑</span>
+                                    <span class="dispatch-btn__label">Amb.</span>
+                                </button>
+                                <button class="dispatch-btn" data-service="fire">
+                                    <span class="icon">🚒</span>
+                                    <span class="dispatch-btn__label">Fire</span>
+                                </button>
+                            </div>
+                            <div style="padding: 1.5rem; border-top: 1px solid var(--border); background: rgba(0,0,0,0.1)">
+                                <label style="display: block; font-size: 0.8rem; color: var(--text-secondary); margin-bottom: 0.5rem">Dispatch Recipient:</label>
+                                <div style="display: flex; gap: 0.5rem">
+                                    <input type="email" id="alert-email" class="form-group" style="flex: 1; margin: 0; padding: 0.6rem; background: rgba(0,0,0,0.2); border: 1px solid var(--border); border-radius: 8px; color: white" placeholder="security@hq.com">
+                                    <button class="btn btn--sm btn--primary" id="btn-save-email">Update</button>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- Forensic Link Section -->
+                        <div class="panel">
+                            <div class="panel__header"><h3>Digital Evidence Analysis</h3></div>
+                            <div class="upload-area">
+                                <div class="upload-box" id="upload-zone">
+                                    <input type="file" id="file-input" class="hidden" accept="video/*">
+                                    <div id="upload-content">
+                                        <div class="icon">📁</div>
+                                        <p id="upload-status-text">Drop Forensic Video for AI Inspection</p>
+                                    </div>
+                                    <p id="upload-status" style="margin-top:0.5rem;"></p>
+                                    <div id="upload-progress-container" class="hidden mt-1-5" style="width: 100%; height: 6px; background: rgba(255,255,255,0.1); border-radius: 10px; overflow: hidden">
+                                        <div id="upload-progress" style="height: 100%; background: var(--accent); width: 0%; transition: 0.4s"></div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Column 2: Event Log -->
+                    <div class="col-side panel events-section">
+                        <div class="panel__header">
+                            <h3>Activity Log</h3>
+                            <select id="filter-type" class="select" style="font-size: 0.75rem">
+                                <option value="">Global Feed</option>
+                                <option value="CRITICAL">Critical Only</option>
+                                <option value="HIGH">High Only</option>
+                                <option value="fight">Fights Only</option>
+                            </select>
+                        </div>
+                        <div class="scroll-pane" id="event-log-container">
+                            <ul id="event-list" class="event-list"></ul>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Operational Map View -->
+            <div id="view-live-map" class="view">
+                <header class="view-header">
+                    <h1>Operational Intelligence Map</h1>
+                </header>
+                <div style="display: grid; grid-template-columns: 3fr 1fr; gap: 1.5rem; height: 70vh">
+                    <div class="panel">
+                        <div id="map" style="height: 100%; width: 100%"></div>
+                    </div>
+                    <div class="panel scroll-pane">
+                        <div class="panel__header"><h3>Nearby Units</h3></div>
+                        <div id="nearby-services" style="display: flex; flex-direction: column; gap: 1rem; padding: 1rem 0;"></div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Forensic Archive View -->
+            <div id="view-history" class="view">
+                <header class="view-header">
+                    <h1>Evidence Archive</h1>
+                </header>
+                <div class="panel scroll-pane" style="height: 75vh">
+                    <ul id="history-list" class="event-list"></ul>
+                </div>
+            </div>
+
+        </main>
+    </div>
+
+    <!-- Persistent Notify Container -->
+    <div id="toast-container" class="toast-container"></div>
+
+    <!-- Scripts -->
+    <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+    <script src="app.js?v=1.2"></script>
+</body>
+</html>

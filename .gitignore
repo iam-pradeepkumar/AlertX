@@ -1,0 +1,14 @@
+# AlertX — Git Ignore
+.env
+venv/
+__pycache__/
+*.pyc
+.db
+alertx.db
+uploads/
+logs/
+.recipient
+.DS_Store
+.vscode/
+.idea/
+*.pt
