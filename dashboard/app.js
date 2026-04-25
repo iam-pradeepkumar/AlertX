@@ -443,6 +443,7 @@ async function startFeed() {
             throw new Error("Browser does not support camera access");
         }
 
+        console.log("AlertX: Server camera failed, initiating browser-side fallback...");
         showToast("Server has no camera. Switching to browser webcam...", "info");
 
         browserStream = await navigator.mediaDevices.getUserMedia({
@@ -459,14 +460,24 @@ async function startFeed() {
         feed.classList.add('hidden');
         placeholder.classList.add('hidden');
 
-        // Wait for video to be ready
-        await new Promise(resolve => {
-            browserCam.onloadedmetadata = () => {
-                canvas.width = browserCam.videoWidth;
-                canvas.height = browserCam.videoHeight;
-                resolve();
-            };
-        });
+        // Robust wait for video metadata
+        if (browserCam.readyState >= 2) {
+            console.log("AlertX: Browser camera metadata already available.");
+            canvas.width = browserCam.videoWidth;
+            canvas.height = browserCam.videoHeight;
+        } else {
+            console.log("AlertX: Waiting for browser camera metadata...");
+            await new Promise((resolve) => {
+                browserCam.onloadedmetadata = () => {
+                    canvas.width = browserCam.videoWidth;
+                    canvas.height = browserCam.videoHeight;
+                    resolve();
+                };
+            });
+        }
+
+        await browserCam.play();
+        console.log("AlertX: Browser camera playback started.");
 
         isLive = true;
         isBrowserCamMode = true;
@@ -475,6 +486,8 @@ async function startFeed() {
 
         // Frame capture loop — send frames to server for YOLO processing
         let isProcessing = false;
+        console.log("AlertX: Starting frame processing loop...");
+        
         browserCamInterval = setInterval(async () => {
             if (!isLive || !isBrowserCamMode || isProcessing) return;
 
@@ -515,15 +528,16 @@ async function startFeed() {
                     updateEvents();
                 }
             } catch (err) {
-                console.error('Browser cam frame error:', err);
+                console.error('AlertX: Browser cam frame error:', err);
             } finally {
                 isProcessing = false;
             }
-        }, 300); // ~3 FPS to avoid overloading the server
+        }, 400); // ~2.5 FPS for stability
 
         showToast("Browser webcam active — AI processing enabled", "success");
 
     } catch (camErr) {
+        console.error("AlertX: Browser camera initialization failed:", camErr);
         showToast("Camera failed: " + camErr.message, "error");
         btn.textContent = "Start Node";
         btn.disabled = false;
