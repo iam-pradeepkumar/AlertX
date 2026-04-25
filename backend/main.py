@@ -23,6 +23,7 @@ from fastapi.staticfiles import StaticFiles
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.security import OAuth2PasswordRequestForm
 from sqlalchemy.orm import Session
+from pydantic import BaseModel
 
 from backend.auth import (
     get_password_hash, 
@@ -166,15 +167,24 @@ async def dispatch_service(service: str):
 
 
 # ── Autonomous Dispatch ──────────────────────
+class SignupRequest(BaseModel):
+    username: str
+    email: str
+    password: str
+
 @app.post("/auth/signup")
-async def signup(username: str = Query(...), email: str = Query(...), password: str = Query(...), db: Session = Depends(get_db)):
+async def signup(request: SignupRequest, db: Session = Depends(get_db)):
     """Create a new user account."""
-    existing_user = db.query(User).filter(User.username == username).first()
+    # Check if user exists
+    existing_user = db.query(User).filter(User.username == request.username).first()
     if existing_user:
         raise HTTPException(status_code=400, detail="Username already registered")
     
-    hashed_pw = get_password_hash(password)
-    new_user = User(username=username, email=email, hashed_password=hashed_pw)
+    new_user = User(
+        username=request.username,
+        email=request.email,
+        hashed_password=get_password_hash(request.password)
+    )
     db.add(new_user)
     db.commit()
     return {"status": "success", "message": "User created successfully"}
