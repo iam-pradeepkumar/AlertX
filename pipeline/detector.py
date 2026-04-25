@@ -47,7 +47,7 @@ class FrameResult:
 class YOLODetector:
     """Lightweight wrapper around Ultralytics YOLO with temporal fight detection."""
 
-    def __init__(self, model_name="yolov8s.pt"): # Upgraded to 'Small' for better accuracy
+    def __init__(self, model_name="yolov8n.pt"): # Reverted to Nano for speed on cloud
         self.model_name = model_name
         self._model = None
         self._model_path = model_name
@@ -94,15 +94,11 @@ class YOLODetector:
         result = FrameResult()
         t0 = time.time()
         
-        # --- IMAGE PRE-PROCESSING (To handle watermarks/noise) ---
-        # 1. Boost Contrast and Brightness
-        alpha = 1.2 # Contrast (1.0-3.0)
-        beta = 10   # Brightness (0-100)
+        # --- LIGHT PRE-PROCESSING (Handling watermarks efficiently) ---
+        # Contrast boost is cheap (fast), Sharpening is expensive (slow).
+        alpha = 1.2 # Contrast
+        beta = 5    # Brightness
         enhanced_frame = cv2.convertScaleAbs(frame, alpha=alpha, beta=beta)
-        
-        # 2. Slight sharpening
-        kernel = np.array([[-1,-1,-1], [-1,9,-1], [-1,-1,-1]])
-        enhanced_frame = cv2.filter2D(enhanced_frame, -1, kernel)
 
         # Run inference (CPU, no grad)
         results = self._model(
