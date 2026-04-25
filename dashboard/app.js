@@ -2,7 +2,13 @@
  * AlertX | Professional Dashboard Logic
  */
 
-const API_BASE = window.location.origin; // Ensure absolute paths for cloud deployments
+const getBaseUrl = () => {
+    const origin = window.location.origin;
+    const path = window.location.pathname.replace(/\/+$/, '');
+    const base = path.endsWith('/dashboard') ? path.slice(0, -10) : path;
+    return origin + base;
+};
+const API_BASE = getBaseUrl();
 console.log("AlertX: System initialized at", API_BASE);
 let token = localStorage.getItem('alertx_token');
 let lastEventId = -1;
@@ -487,9 +493,11 @@ async function startFeed() {
 
         // Frame capture loop — send frames to server for YOLO processing
         let isProcessing = false;
-        console.log("AlertX: Starting frame processing loop...");
+        console.log("AlertX: Starting frame processing loop in 1s...");
         
-        browserCamInterval = setInterval(async () => {
+        // Small delay to let the model settle on the server
+        setTimeout(() => {
+            browserCamInterval = setInterval(async () => {
             if (!isLive || !isBrowserCamMode || isProcessing) return;
 
             isProcessing = true;
@@ -533,14 +541,13 @@ async function startFeed() {
                     }
                     updateEvents();
                 }
-            } catch (err) {
-                console.error('AlertX: Browser cam frame error:', err);
             } finally {
                 isProcessing = false;
             }
         }, 400); // ~2.5 FPS for stability
+    }, 1000);
 
-        showToast("Browser webcam active — AI processing enabled", "success");
+    showToast("Browser webcam active — AI processing enabled", "success");
 
     } catch (camErr) {
         console.error("AlertX: Browser camera initialization failed:", camErr);

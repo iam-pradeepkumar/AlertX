@@ -108,6 +108,13 @@ agent_executor = ThreadPoolExecutor(max_workers=3)
 _is_processing_incident = False # Busy lock to prevent lag during heavy analysis
 _last_high_priority_event = None # Store context for Voice AI
 _stream_tickets: Dict[str, float] = {}
+
+@app.on_event("startup")
+async def startup_event():
+    """Pre-load YOLO model on startup."""
+    print("🚀 Pre-loading YOLO model...")
+    detector.load()
+    print("✅ Model ready.")
 _alert_recipient = ""
 _last_high_priority_event = "No recent incident recorded."
 
@@ -377,7 +384,8 @@ async def start_camera(source: str = Query(default="0"), current_user: str = Dep
     frame_grabber = FrameGrabber(source=source)
     success = frame_grabber.start()
     if not success:
-        raise HTTPException(status_code=500, detail=f"Cannot open camera source: {source}")
+        # Returning 404 instead of 500 to signal "no camera" cleanly to the frontend
+        raise HTTPException(status_code=404, detail=f"Camera source unavailable: {source}")
 
     # Start processing thread
     _processing_live = True
