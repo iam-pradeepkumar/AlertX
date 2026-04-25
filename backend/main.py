@@ -108,6 +108,7 @@ agent_executor = ThreadPoolExecutor(max_workers=3)
 _is_processing_incident = False # Busy lock to prevent lag during heavy analysis
 _last_high_priority_event = None # Store context for Voice AI
 _stream_tickets: Dict[str, float] = {}
+_last_activity_time = 0.0 # Track any camera activity (server or browser)
 
 @app.on_event("startup")
 async def startup_event():
@@ -282,6 +283,9 @@ def _live_processing_loop():
                 _latest_annotated_frame = result.annotated_frame
                 _last_frame_id = frame_idx
                 
+                global _last_activity_time
+                _last_activity_time = time.time()
+                
                 if result.incidents:
                     run_agent_pipeline(result, source="live", frame_index=frame_idx)
             except Exception as e:
@@ -431,6 +435,42 @@ async def upload_video(file: UploadFile = File(...), current_user: str = Depends
     }
 
 
+@app.post("/process_frame")
+async def process_frame(file: UploadFile = File(...), current_user: str = Depends(get_current_user)):
+    """Process a single frame sent from the browser webcam (Cloud Mode)."""
+    global _latest_annotated_frame, _last_frame_id, _last_activity_time
+    
+    contents = await file.read()
+    nparr = np.frombuffer(contents, np.uint8)
+    frame = cv2.imdecode(nparr, cv2.IMREAD_COLOR)
+    
+    if frame is None:
+        return {"status": "error", "message": "Invalid image"}
+        
+    # Update activity time for multi-device sync
+    _last_activity_time = time.time()
+
+    if not detector._loaded:
+        detector.load()
+        
+    result = detector.detect(frame)
+    _latest_annotated_frame = result.annotated_frame
+    
+    # Trigger agents if incidents found
+    if result.incidents:
+        run_agent_pipeline(result, source="browser_cam")
+
+    # Encode result to send back to browser
+    _, buffer = cv2.imencode('.jpg', result.annotated_frame, [cv2.IMWRITE_JPEG_QUALITY, 50])
+    img_str = base64.b64encode(buffer).decode()
+    
+    return {
+        "status": "success",
+        "frame": img_str,
+        "incidents": result.incidents
+    }
+
+
 # ── Analyze ────────────────────────────────────
 @app.post("/analyze")
 def analyze_video(filename: str = Query(...), current_user: str = Depends(get_current_user)):
@@ -545,9 +585,13 @@ async def acknowledge_event(event_id: str):
 @app.get("/status")
 async def system_status():
     """Overall system health and component status."""
+    # Active if server grabber is running OR browser is pushing frames (last 10s)
+    is_active = (frame_grabber is not None and frame_grabber.is_running) or \
+                (time.time() - _last_activity_time < 10.0)
+                
     return {
         "status": "online",
-        "camera_active": frame_grabber is not None and frame_grabber.is_running if frame_grabber else False,
+        "camera_active": is_active,
         "model_loaded": detector.is_loaded,
         "agents": {
             "detection": detection_agent.stats,
@@ -561,57 +605,6 @@ async def system_status():
     }
 
 
-# ── Browser Webcam Processing (Cloud Deployment) ──
-@app.post("/process_frame")
-async def process_frame(file: UploadFile = File(...), current_user: str = Depends(get_current_user)):
-    """
-    Accept a JPEG frame from the browser webcam, run YOLO detection,
-    and return the annotated frame + incident data.
-    Used when the server has no local camera (e.g. HuggingFace Spaces).
-    """
-    global _last_high_priority_event
-
-    # Load model if needed
-    if not detector.is_loaded:
-        detector.load()
-
-    # Decode the uploaded JPEG into an OpenCV frame
-    contents = await file.read()
-    nparr = np.frombuffer(contents, np.uint8)
-    frame = cv2.imdecode(nparr, cv2.IMREAD_COLOR)
-
-    if frame is None:
-        raise HTTPException(status_code=400, detail="Invalid image data")
-
-    # Resize to standard processing size
-    frame = cv2.resize(frame, (FRAME_WIDTH, FRAME_HEIGHT))
-
-    # Run YOLO detection
-    result = detector.detect(frame)
-
-    # Run agent pipeline in background if incidents detected
-    incidents_data = []
-    if result.incidents:
-        run_agent_pipeline(result, source="browser_cam", frame_index=0)
-        for inc in result.incidents:
-            incidents_data.append({
-                "type": inc["type"],
-                "confidence": round(inc["confidence"], 3),
-                "class_name": inc["class_name"],
-                "count": inc.get("count", 1),
-            })
-
-    # Encode annotated frame back to JPEG
-    out_frame = result.annotated_frame if result.annotated_frame is not None else frame
-    _, buffer = cv2.imencode(".jpg", out_frame, [cv2.IMWRITE_JPEG_QUALITY, 70])
-    frame_b64 = base64.b64encode(buffer.tobytes()).decode("utf-8")
-
-    return {
-        "frame": frame_b64,
-        "incidents": incidents_data,
-        "person_count": result.person_count,
-        "inference_ms": result.inference_ms,
-    }
 
 
 # ── Static Dashboard (Must be last) ────────────
