@@ -98,12 +98,8 @@ class YOLODetector:
         # Save clean copy for secondary AI (CLIP)
         result.raw_frame = frame.copy()
         
-        # --- OPTIMIZATION: Ultra-low resolution for cloud ---
-        # 160px is the absolute fastest for YOLOv8
-        frame = cv2.resize(frame, (160, 160), interpolation=cv2.INTER_NEAREST)
-
         # --- LIGHT PRE-PROCESSING ---
-        # Removed contrast boost to prevent shadow artifacts (ghost phones)
+        # Removed internal resize to keep coordinates synced with client
         enhanced_frame = frame 
 
         # Run inference (Fastest settings)
@@ -113,7 +109,7 @@ class YOLODetector:
             iou=YOLO_IOU_THRESHOLD,
             verbose=False,
             device="cpu",
-            imgsz=160,
+            imgsz=640,
         )
 
         result.inference_ms = round((time.time() - t0) * 1000, 1)
