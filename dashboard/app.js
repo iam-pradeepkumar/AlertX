@@ -2,7 +2,8 @@
  * AlertX | Professional Dashboard Logic
  */
 
-const API_BASE = ""; // Relative URL
+const API_BASE = window.location.origin; // Ensure absolute paths for cloud deployments
+console.log("AlertX: System initialized at", API_BASE);
 let token = localStorage.getItem('alertx_token');
 let lastEventId = -1;
 let map = null;
@@ -504,15 +505,20 @@ async function startFeed() {
                 const formData = new FormData();
                 formData.append('file', blob, 'frame.jpg');
 
-                const response = await fetch('/process_frame', {
+                const processUrl = `${API_BASE}/process_frame`;
+                const response = await fetch(processUrl, {
                     method: 'POST',
                     headers: { 'Authorization': `Bearer ${token}` },
                     body: formData
                 });
 
-                if (!response.ok) throw new Error('Frame processing failed');
+                if (!response.ok) {
+                    console.error('AlertX: Frame processing failed with status:', response.status);
+                    throw new Error('Frame processing failed');
+                }
 
                 const data = await response.json();
+                console.log("AlertX: Received processed frame, incidents:", data.incidents.length);
 
                 // Display the annotated frame
                 feed.src = `data:image/jpeg;base64,${data.frame}`;
