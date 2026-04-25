@@ -43,19 +43,27 @@ async function apiRequest(endpoint, method = 'GET', body = null, isForm = false)
         }
     }
 
-    const response = await fetch(`${API_BASE}${endpoint}`, options);
-    
-    if (response.status === 401) {
-        logout();
-        throw new Error("Session expired. Please login again.");
+    try {
+        const response = await fetch(`${API_BASE}${endpoint}`, options);
+        
+        if (response.status === 401) {
+            if (endpoint !== '/auth/login') {
+                logout();
+                throw new Error("Session expired. Please login again.");
+            } else {
+                throw new Error("Invalid username or password.");
+            }
+        }
+        
+        const data = await response.json();
+        if (!response.ok) {
+            throw new Error(data.detail || "Request failed");
+        }
+        return data;
+    } catch (err) {
+        console.error(`AlertX API Error (${endpoint}):`, err);
+        throw err;
     }
-    
-    if (!response.ok) {
-        const error = await response.json();
-        throw new Error(error.detail || "Request failed");
-    }
-    
-    return response.json();
 }
 
 function login(username, password) {
@@ -70,12 +78,16 @@ function login(username, password) {
 }
 
 function signup(username, email, password) {
-    apiRequest(`/auth/signup?username=${username}&email=${email}&password=${password}`, 'POST')
+    // Better compatibility: Send as JSON body
+    apiRequest('/auth/signup', 'POST', { username, email, password })
         .then(() => {
-            showToast("Account created. Please log in.", "success");
+            showToast("Account created successfully. Please login.", "success");
             switchOverlay('auth-overlay');
         })
-        .catch(err => showToast(err.message, "error"));
+        .catch(err => {
+            console.error("Signup failed:", err);
+            showToast(`Signup Failed: ${err.message}`, "error");
+        });
 }
 
 function logout() {
