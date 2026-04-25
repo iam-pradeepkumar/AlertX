@@ -33,9 +33,9 @@ FPS_LIMIT = 15  # max frames per second to process
 # YOLO Model
 # ──────────────────────────────────────────────
 YOLO_MODEL = os.getenv("ALERTX_YOLO_MODEL", "yolov8n.pt")  # Use Nano model for free cloud tier CPU
-YOLO_CONF_THRESHOLD = 0.40  # Increased for less noise
+YOLO_CONF_THRESHOLD = 0.55  # INCREASED: Be much more certain before detecting
 YOLO_IOU_THRESHOLD = 0.45
-WEAPON_CONF_THRESHOLD = 0.55 # Stricter for weapons to avoid crowd noise
+WEAPON_CONF_THRESHOLD = 0.65 # Stricter for weapons
 
 # ──────────────────────────────────────────────
 # Detection — class-to-incident mapping

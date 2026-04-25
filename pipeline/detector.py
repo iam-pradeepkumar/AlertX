@@ -129,9 +129,13 @@ class YOLODetector:
             conf = float(box.conf[0])
             class_name = names.get(cls_id, "unknown")
             bbox = tuple(box.xyxy[0].tolist())
-
-            # Map to incident type
             incident_type = INCIDENT_CLASS_MAP.get(class_name, "")
+
+            # NOISE FILTER: Ignore tiny objects (shadows, specks)
+            x1, y1, x2, y2 = bbox
+            area = (x2 - x1) * (y2 - y1)
+            if area < 800: # Ignore tiny blobs
+                continue
 
             det = Detection(
                 class_name=class_name,
