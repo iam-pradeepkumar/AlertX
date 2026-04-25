@@ -307,6 +307,22 @@ async function updateStatus() {
         
         const statusMsg = document.getElementById('system-status-msg');
         if (statusMsg) statusMsg.textContent = data.camera_active ? "AI Node Online" : "AI Node Standby";
+
+        // AUTO-VIEW: If a camera is active elsewhere, show it here too
+        if (data.camera_active && !isLive) {
+            console.log("AlertX: Active node detected on another device. Syncing feed...");
+            const authData = await apiRequest('/auth/stream-token', 'POST', null, true);
+            const ticket = authData.ticket;
+            const feed = document.getElementById('video-feed');
+            const placeholder = document.getElementById('feed-placeholder');
+            const btn = document.getElementById('btn-start');
+
+            feed.src = `${API_BASE}/video_feed?ticket=${ticket}&t=${new Date().getTime()}`;
+            feed.classList.remove('hidden');
+            placeholder.classList.add('hidden');
+            isLive = true;
+            btn.textContent = "Node Online";
+        }
     } catch (e) { console.error(e); }
 }
 
