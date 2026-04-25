@@ -326,7 +326,7 @@ def _get_latest_frame():
     h, w = out.shape[:2]
     new_w = 400
     new_h = int(h * (400 / w))
-    small_frame = cv2.resize(out, (new_w, new_h), interpolation=cv2.INTER_AREA)
+    small_frame = cv2.resize(out, (new_w, new_h), interpolation=cv2.INTER_NEAREST)
     _, buffer = cv2.imencode(".jpg", small_frame, [cv2.IMWRITE_JPEG_QUALITY, 20])
     
     _latest_encoded_frame = buffer.tobytes()
@@ -347,8 +347,8 @@ def _video_generator():
                     b"Content-Type: image/jpeg\r\n\r\n" + frame_bytes + b"\r\n"
                 )
         
-        # Performance: Limit stream to ~10 FPS to save bandwidth and CPU
-        time.sleep(0.1)
+        # Performance: Lower wait time for higher FPS
+        time.sleep(0.01)
 
 @app.get("/video_feed")
 async def video_feed(ticket: str = Query(...)):

@@ -95,23 +95,22 @@ class YOLODetector:
         t0 = time.time()
         
         # --- OPTIMIZATION: Ultra-low resolution for cloud ---
-        # Resizing here makes everything below (contrast, AI) 4x faster
-        frame = cv2.resize(frame, (320, 240), interpolation=cv2.INTER_AREA)
+        # 160px is the absolute fastest for YOLOv8
+        frame = cv2.resize(frame, (160, 160), interpolation=cv2.INTER_NEAREST)
 
-        # --- LIGHT PRE-PROCESSING (Handling watermarks efficiently) ---
-        # Contrast boost is cheap (fast), Sharpening is expensive (slow).
-        alpha = 1.2 # Contrast
-        beta = 5    # Brightness
+        # --- LIGHT PRE-PROCESSING ---
+        alpha = 1.1 # Reduced contrast slightly to save CPU
+        beta = 2
         enhanced_frame = cv2.convertScaleAbs(frame, alpha=alpha, beta=beta)
 
-        # Run inference (CPU, no grad)
+        # Run inference (Fastest settings)
         results = self._model(
             enhanced_frame,
             conf=YOLO_CONF_THRESHOLD,
             iou=YOLO_IOU_THRESHOLD,
             verbose=False,
             device="cpu",
-            imgsz=320,
+            imgsz=160,
         )
 
         result.inference_ms = round((time.time() - t0) * 1000, 1)
