@@ -47,9 +47,10 @@ class FrameResult:
 class YOLODetector:
     """Lightweight wrapper around Ultralytics YOLO with temporal fight detection."""
 
-    def __init__(self, model_path: str = YOLO_MODEL):
+    def __init__(self, model_name="yolov8s.pt"): # Upgraded to 'Small' for better accuracy
+        self.model_name = model_name
         self._model = None
-        self._model_path = model_path
+        self._model_path = model_name
         self._loaded = False
         # Temporal buffers for scuffle consistency
         self._interaction_history = []  # List of bools for recent frames
@@ -92,16 +93,20 @@ class YOLODetector:
 
         result = FrameResult()
         t0 = time.time()
-        # OPTIMIZATION: Downscale frame for faster CPU inference if it's large
-        h, w = frame.shape[:2]
-        if w > 320:
-            detect_frame = cv2.resize(frame, (320, 240))
-        else:
-            detect_frame = frame
+        
+        # --- IMAGE PRE-PROCESSING (To handle watermarks/noise) ---
+        # 1. Boost Contrast and Brightness
+        alpha = 1.2 # Contrast (1.0-3.0)
+        beta = 10   # Brightness (0-100)
+        enhanced_frame = cv2.convertScaleAbs(frame, alpha=alpha, beta=beta)
+        
+        # 2. Slight sharpening
+        kernel = np.array([[-1,-1,-1], [-1,9,-1], [-1,-1,-1]])
+        enhanced_frame = cv2.filter2D(enhanced_frame, -1, kernel)
 
         # Run inference (CPU, no grad)
         results = self._model(
-            detect_frame,
+            enhanced_frame,
             conf=YOLO_CONF_THRESHOLD,
             iou=YOLO_IOU_THRESHOLD,
             verbose=False,
