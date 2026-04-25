@@ -38,6 +38,7 @@ class FrameResult:
     """All detections + derived incidents for one frame."""
     detections: List[Detection] = field(default_factory=list)
     incidents: List[dict] = field(default_factory=list)
+    raw_frame: Optional[np.ndarray] = None # Added for secondary AI validation
     annotated_frame: Optional[np.ndarray] = None
     inference_ms: float = 0.0
     person_count: int = 0
@@ -93,6 +94,9 @@ class YOLODetector:
 
         result = FrameResult()
         t0 = time.time()
+        
+        # Save clean copy for secondary AI (CLIP)
+        result.raw_frame = frame.copy()
         
         # --- OPTIMIZATION: Ultra-low resolution for cloud ---
         # 160px is the absolute fastest for YOLOv8

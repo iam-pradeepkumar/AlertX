@@ -51,9 +51,10 @@ class ViolenceAgent:
         if not self._loaded:
             self.load()
 
-        # Get raw frame from result
-        # Note: frame_result.annotated_frame is used here for context
-        frame = result.annotated_frame
+        # Use the raw frame (clean) instead of annotated for much better accuracy
+        frame = result.raw_frame if result.raw_frame is not None else result.annotated_frame
+        if frame is None: return data
+        
         image = Image.fromarray(cv2.cvtColor(frame, cv2.COLOR_BGR2RGB))
         image_input = self.preprocess(image).unsqueeze(0).to(self.device)
         text_inputs = clip.tokenize(self.labels).to(self.device)
@@ -74,14 +75,16 @@ class ViolenceAgent:
         accident_prob = scores["a photo of a car accident or crash"]
         fire_prob = scores["a photo of a fire or smoke"]
 
-        if violence_prob > 0.4:
+        # MUCH STRICTER: Require 75%+ confidence to confirm violence
+        if violence_prob > 0.75:
             logger.warning(f"CLIP confirmed VIOLENCE with {violence_prob:.2f} confidence")
             # Inject into incidents if not there
             if not any(i["type"] == "fight" for i in result.incidents):
                 result.incidents.append({"type": "fight", "confidence": violence_prob, "class_name": "clip_validation"})
             data["high_priority_summary"] = "Confirmed physical altercation detected via secondary AI analysis."
 
-        if fire_prob > 0.6:
+        # STRICTER: Require 80% for fire (to avoid confusing with lights)
+        if fire_prob > 0.8:
              logger.warning(f"CLIP confirmed FIRE with {fire_prob:.2f} confidence")
              if not any(i["type"] == "fire" for i in result.incidents):
                 result.incidents.append({"type": "fire", "confidence": fire_prob, "class_name": "clip_validation"})
