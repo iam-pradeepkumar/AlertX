@@ -37,11 +37,11 @@ class FrameGrabber:
         """Open source and begin grabbing in background thread."""
         actual_source = self.source
         
-        # YouTube / Generic Stream Extraction
-        if isinstance(self.source, str) and ("youtube.com" in self.source or "youtu.be" in self.source):
+        # Stream Extraction for YouTube, Twitch, Kick, etc.
+        if isinstance(self.source, str) and self.source.startswith("http"):
             try:
                 import yt_dlp
-                logger.info(f"Extracting stream URL from YouTube: {self.source}")
+                logger.info(f"Extracting stream URL from: {self.source}")
                 ydl_opts = {
                     'format': 'best[ext=mp4]/best',
                     'quiet': True,
@@ -52,8 +52,9 @@ class FrameGrabber:
                     actual_source = info.get('url')
                     logger.info("Successfully extracted stream URL.")
             except Exception as e:
-                logger.error(f"Failed to extract YouTube stream: {e}")
-                return False
+                logger.error(f"Failed to extract stream: {e}")
+                # Fallback: try opening the raw source anyway
+                actual_source = self.source
 
         self._cap = cv2.VideoCapture(actual_source)
         if not self._cap.isOpened():
