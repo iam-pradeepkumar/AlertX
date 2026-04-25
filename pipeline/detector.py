@@ -245,8 +245,36 @@ class YOLODetector:
 
         result.incidents = list(incident_map.values())
 
-        # Annotated frame
-        result.annotated_frame = r.plot()
+        # ── LIGHTWEIGHT ANNOTATION ──
+        # We skip r.plot() because it's too heavy for cloud CPUs.
+        annotated = frame.copy()
+        
+        # Color palette
+        colors = {
+            "person": (0, 255, 0),     # Green
+            "weapon": (0, 0, 255),     # Red
+            "fight": (0, 0, 255),      # Red
+            "accident": (0, 165, 255), # Orange
+            "fire": (0, 0, 255),
+        }
+        
+        # Draw incidents (boxes only, no fancy transparency)
+        for inc in result.incidents:
+            # We don't have the original bbox in result.incidents, 
+            # so we look at detections to draw.
+            pass
+
+        # Draw all detections
+        for det in result.detections:
+            color = colors.get(det.class_name, colors.get(det.incident_type, (255, 255, 255)))
+            x1, y1, x2, y2 = map(int, det.bbox)
+            cv2.rectangle(annotated, (x1, y1), (x2, y2), color, 1)
+            
+            # Simple text label
+            label = f"{det.class_name} {int(det.confidence*100)}%"
+            cv2.putText(annotated, label, (x1, y1 - 5), cv2.FONT_HERSHEY_SIMPLEX, 0.4, color, 1)
+
+        result.annotated_frame = annotated
 
         return result
 

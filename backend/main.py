@@ -248,13 +248,18 @@ def _bg_agent_task(frame_result, source, frame_index, recipient):
     finally:
         _is_processing_incident = False
 
+_last_pipeline_run = 0.0
+
 def run_agent_pipeline(frame_result, source="live", frame_index=0):
     """Offloads the agent pipeline to a background thread to prevent camera lag."""
-    # If we are already grinding on a busy action frame, skip the next pipeline run
-    global _is_processing_incident
-    if _is_processing_incident:
+    global _is_processing_incident, _last_pipeline_run
+    
+    # PERFORMANCE: Only run the heavy agent pipeline every 2 seconds for a specific incident
+    # This prevents the CPU from choking when detection is active
+    if _is_processing_incident or (time.time() - _last_pipeline_run < 2.0):
         return
         
+    _last_pipeline_run = time.time()
     global _alert_recipient
     # Submit to worker pool
     agent_executor.submit(_bg_agent_task, frame_result, source, frame_index, _alert_recipient)
