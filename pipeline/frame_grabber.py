@@ -43,7 +43,8 @@ class FrameGrabber:
                 import yt_dlp
                 logger.info(f"Extracting stream URL from: {self.source}")
                 ydl_opts = {
-                    'format': 'best[ext=mp4]/best',
+                    # Request 360p or 480p to save CPU and bandwidth
+                    'format': 'best[height<=480]/best[height<=720]/best',
                     'quiet': True,
                     'noplaylist': True,
                 }
@@ -63,6 +64,7 @@ class FrameGrabber:
 
         self._cap.set(cv2.CAP_PROP_FRAME_WIDTH, FRAME_WIDTH)
         self._cap.set(cv2.CAP_PROP_FRAME_HEIGHT, FRAME_HEIGHT)
+        self._cap.set(cv2.CAP_PROP_BUFFERSIZE, 1) # ZERO LATENCY: No internal buffering
         self._running = True
         self._thread = threading.Thread(target=self._grab_loop, daemon=True)
         self._thread.start()
