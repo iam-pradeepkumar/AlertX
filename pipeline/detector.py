@@ -103,9 +103,8 @@ class YOLODetector:
         frame = cv2.resize(frame, (160, 160), interpolation=cv2.INTER_NEAREST)
 
         # --- LIGHT PRE-PROCESSING ---
-        alpha = 1.1 # Reduced contrast slightly to save CPU
-        beta = 2
-        enhanced_frame = cv2.convertScaleAbs(frame, alpha=alpha, beta=beta)
+        # Removed contrast boost to prevent shadow artifacts (ghost phones)
+        enhanced_frame = frame 
 
         # Run inference (Fastest settings)
         results = self._model(
@@ -135,10 +134,19 @@ class YOLODetector:
             bbox = tuple(box.xyxy[0].tolist())
             incident_type = INCIDENT_CLASS_MAP.get(class_name, "")
 
+            # SECURITY FILTER: Only detect what matters (Person, Weapon, Fire, Vehicle)
+            # If it's not in our map, it's noise for a security app.
+            if not incident_type:
+                continue
+
             # NOISE FILTER: Ignore tiny objects (shadows, specks)
             x1, y1, x2, y2 = bbox
             area = (x2 - x1) * (y2 - y1)
-            if area < 800: # Ignore tiny blobs
+            if area < 1000: # Increased slightly to filter more noise
+                continue
+            
+            # ACCURACY: Objects (weapons/fire) need higher confidence than people
+            if class_name != "person" and conf < 0.65:
                 continue
 
             det = Detection(
