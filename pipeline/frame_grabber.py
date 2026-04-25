@@ -43,10 +43,11 @@ class FrameGrabber:
                 import yt_dlp
                 logger.info(f"Extracting stream URL from: {self.source}")
                 ydl_opts = {
-                    # Request 360p or 480p to save CPU and bandwidth
                     'format': 'best[height<=480]/best[height<=720]/best',
                     'quiet': True,
                     'noplaylist': True,
+                    'nocheckcertificate': True, # Bypass SSL errors
+                    'user_agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36'
                 }
                 with yt_dlp.YoutubeDL(ydl_opts) as ydl:
                     info = ydl.extract_info(self.source, download=False)
