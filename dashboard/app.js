@@ -77,9 +77,9 @@ function login(username, password) {
         .catch(err => showToast(err.message, "error"));
 }
 
-function signup(username, email, password) {
+function signup(username, email, password, role = "civilian", badge_id = "") {
     // Better compatibility: Send as JSON body
-    apiRequest('/auth/signup', 'POST', { username, email, password })
+    apiRequest('/auth/signup', 'POST', { username, email, password, role, badge_id })
         .then(() => {
             showToast("Account created successfully. Please login.", "success");
             switchOverlay('auth-overlay');
@@ -183,8 +183,10 @@ function initMap() {
     if (map) return;
     
     map = L.map('map').setView(userPos, 13);
-    L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
-        attribution: '© OpenStreetMap contributors'
+    L.tileLayer('https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png', {
+        attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors &copy; <a href="https://carto.com/attributions">CARTO</a>',
+        subdomains: 'abcd',
+        maxZoom: 20
     }).addTo(map);
 
     // Dark mode map filter
@@ -236,17 +238,16 @@ async function findNearbyServices(pos) {
 
     const lat = pos[0];
     const lon = pos[1];
-    const radius = 5000; // 5km search radius
+    const radius = 10000; // Increased to 10km for better coverage
 
-    // Overpass QL to find nearby police, hospitals, and fire stations
+    // Comprehensive Overpass query for emergency services
     const query = `
-        [out:json][timeout:10];
+        [out:json][timeout:25];
         (
-          node["amenity"="police"](around:${radius},${lat},${lon});
-          node["amenity"="hospital"](around:${radius},${lat},${lon});
-          node["amenity"="fire_station"](around:${radius},${lat},${lon});
+          node["amenity"~"police|hospital|fire_station|ambulance_station|emergency_phone|doctor"](around:${radius},${lat},${lon});
+          way["amenity"~"police|hospital|fire_station|ambulance_station"](around:${radius},${lat},${lon});
         );
-        out body 5;
+        out center body 15;
     `;
 
     try {
@@ -435,13 +436,13 @@ async function updateEvents() {
         const data = await apiRequest(url);
         const events = data.events || [];
         
-        // Performance: Only redraw if there's a CHANGE
-        const newHash = events.map(e => e.id).join(',');
-        if (window._lastEventHash === newHash) return;
-        window._lastEventHash = newHash;
-
         const container = document.getElementById('event-list');
         
+        if (events.length === 0) {
+            container.innerHTML = `<li style="padding: 2rem; text-align: center; color: var(--text-secondary);">No events found matching the current filter.</li>`;
+            return;
+        }
+
         container.innerHTML = events.map(e => {
             let mediaPath = e.media_path;
             if (!mediaPath && e.source && e.source.startsWith('upload:')) {
@@ -819,9 +820,20 @@ document.addEventListener('DOMContentLoaded', () => {
         signup(
             document.getElementById('signup-user').value, 
             document.getElementById('signup-email').value, 
-            document.getElementById('signup-pass').value
+            document.getElementById('signup-pass').value,
+            document.getElementById('signup-role').value,
+            document.getElementById('signup-badge').value
         );
     };
+
+    const signupRole = document.getElementById('signup-role');
+    if (signupRole) {
+        signupRole.onchange = (e) => {
+            const badgeGroup = document.getElementById('badge-group');
+            if (e.target.value === 'official') badgeGroup.classList.remove('hidden');
+            else badgeGroup.classList.add('hidden');
+        };
+    }
 
     document.getElementById('show-signup').onclick = (e) => {
         e.preventDefault();

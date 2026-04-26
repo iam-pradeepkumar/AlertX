@@ -178,6 +178,8 @@ class SignupRequest(BaseModel):
     username: str
     email: str
     password: str
+    role: Optional[str] = "civilian"
+    badge_id: Optional[str] = ""
 
 @app.post("/auth/signup")
 async def signup(request: SignupRequest, db = Depends(get_db)):
@@ -188,7 +190,7 @@ async def signup(request: SignupRequest, db = Depends(get_db)):
         raise HTTPException(status_code=400, detail="Username already registered")
     
     hashed_password = get_password_hash(request.password)
-    db.save_user(request.username, request.email, hashed_password)
+    db.save_user(request.username, request.email, hashed_password, request.role, request.badge_id)
     return {"status": "success", "message": "User created successfully"}
 
 @app.post("/auth/login")

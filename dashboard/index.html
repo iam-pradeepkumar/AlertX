@@ -66,10 +66,21 @@
                     <input type="email" id="signup-email" required>
                 </div>
                 <div class="form-group">
-                    <label>Node Access Key</label>
-                    <input type="password" id="signup-pass" required minlength="8">
+                    <label>Password</label>
+                    <input type="password" id="signup-pass" required placeholder="••••••••">
                 </div>
-                <button type="submit" class="btn btn--primary btn--block">Create Node</button>
+                <div class="form-group">
+                    <label>Personnel Type</label>
+                    <select id="signup-role" style="width: 100%; background: rgba(15, 23, 42, 0.6); border: 1px solid var(--border); padding: 0.9rem 1.1rem; color: white; border-radius: 10px; outline: none;">
+                        <option value="civilian">Civilian / Citizen</option>
+                        <option value="official">Government Official</option>
+                    </select>
+                </div>
+                <div id="badge-group" class="form-group hidden">
+                    <label>Official Badge ID</label>
+                    <input type="text" id="signup-badge" placeholder="e.g. AX-9921">
+                </div>
+                <button type="submit" class="btn btn--primary btn--full">Create Account</button>
             </form>
             <div class="mt-1-5">
                 <p style="font-size: 0.85rem; color: var(--text-secondary)">

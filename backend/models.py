@@ -24,13 +24,15 @@ class DBStore:
         return [{"id": d.id, **d.to_dict()} for d in docs]
 
     @staticmethod
-    def save_user(username, email, hashed_password):
+    def save_user(username, email, hashed_password, role="civilian", badge_id=""):
         db = get_firestore()
         if db:
             db.collection("users").document(username).set({
                 "username": username,
                 "email": email,
                 "hashed_password": hashed_password,
+                "role": role,
+                "badge_id": badge_id,
                 "created_at": datetime.utcnow()
             })
             return True
