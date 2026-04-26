@@ -205,26 +205,81 @@ function initMap() {
     }
 }
 
-function findNearbyServices(pos) {
-    // Simulated nearby services (mocked for production look)
-    const services = [
-        { name: "City Central Police", type: "police", dist: "1.2km", icon: "👮" },
-        { name: "Metro General Hospital", type: "ambulance", dist: "2.4km", icon: "🚑" },
-        { name: "Fire Station #4", type: "fire", dist: "0.8km", icon: "🚒" },
-        { name: "St. Jude Clinic", type: "ambulance", dist: "3.1km", icon: "🏥" },
-        { name: "East Side Precinct", type: "police", dist: "4.5km", icon: "🚓" }
-    ];
-    
+async function findNearbyServices(pos) {
     const container = document.getElementById('nearby-services');
-    container.innerHTML = services.map(s => `
-        <div class="service-card">
-            <div class="service-icon">${s.icon}</div>
-            <div class="service-info">
-                <h4>${s.name}</h4>
-                <p>${s.type.toUpperCase()} • ${s.dist}</p>
+    container.innerHTML = '<div style="text-align:center; padding:2rem;"><span class="spinner-sm"></span><p style="font-size:0.8rem; color:#8b8ba3; margin-top:10px;">Scanning sector via Overpass AI...</p></div>';
+
+    const lat = pos[0];
+    const lon = pos[1];
+    const radius = 5000; // 5km search radius
+
+    // Overpass QL to find nearby police, hospitals, and fire stations
+    const query = `
+        [out:json][timeout:10];
+        (
+          node["amenity"="police"](around:${radius},${lat},${lon});
+          node["amenity"="hospital"](around:${radius},${lat},${lon});
+          node["amenity"="fire_station"](around:${radius},${lat},${lon});
+        );
+        out body 5;
+    `;
+
+    try {
+        const response = await fetch("https://overpass-api.de/api/interpreter", {
+            method: "POST",
+            body: query
+        });
+        
+        if (!response.ok) throw new Error("Overpass API failed");
+        
+        const data = await response.json();
+        
+        if (!data.elements || data.elements.length === 0) {
+            container.innerHTML = '<p style="text-align:center; color:#8b8ba3;">No verified units in sector.</p>';
+            return;
+        }
+
+        // Calculate rough distance helper
+        const calcDist = (lat1, lon1, lat2, lon2) => {
+            const R = 6371; // km
+            const dLat = (lat2-lat1) * Math.PI / 180;
+            const dLon = (lon2-lon1) * Math.PI / 180;
+            const a = Math.sin(dLat/2) * Math.sin(dLat/2) +
+                      Math.cos(lat1 * Math.PI / 180) * Math.cos(lat2 * Math.PI / 180) *
+                      Math.sin(dLon/2) * Math.sin(dLon/2);
+            return R * (2 * Math.atan2(Math.sqrt(a), Math.sqrt(1-a)));
+        };
+
+        const services = data.elements.map(el => {
+            const type = el.tags.amenity || 'unknown';
+            let icon = '🛡️';
+            if (type === 'police') icon = '🚓';
+            if (type === 'hospital') icon = '🚑';
+            if (type === 'fire_station') icon = '🚒';
+            
+            const dist = calcDist(lat, lon, el.lat, el.lon).toFixed(1) + "km";
+            const name = el.tags.name || `Local ${type.charAt(0).toUpperCase() + type.slice(1).replace('_', ' ')}`;
+            
+            return { name, type: type.replace('_', ' '), dist, icon };
+        });
+
+        // Sort by distance roughly
+        services.sort((a, b) => parseFloat(a.dist) - parseFloat(b.dist));
+
+        container.innerHTML = services.map(s => `
+            <div class="service-card" style="display: flex; align-items: center; background: rgba(255,255,255,0.05); padding: 10px; border-radius: 8px; border: 1px solid rgba(255,255,255,0.1);">
+                <div class="service-icon" style="font-size: 1.5rem; margin-right: 15px; background: rgba(0,0,0,0.3); width: 40px; height: 40px; display: flex; align-items: center; justify-content: center; border-radius: 8px;">${s.icon}</div>
+                <div class="service-info">
+                    <h4 style="margin: 0; font-size: 0.9rem;">${s.name}</h4>
+                    <p style="margin: 3px 0 0; font-size: 0.75rem; color: #8b8ba3; text-transform: uppercase;">${s.type} • <span style="color:#4ade80">${s.dist}</span></p>
+                </div>
             </div>
-        </div>
-    `).join('');
+        `).join('');
+
+    } catch (e) {
+        console.error("AlertX: Failed to fetch real geo-intelligence:", e);
+        container.innerHTML = '<p style="text-align:center; color:#ef4444;">Geo-sync offline.</p>';
+    }
 }
 
 // ── UPLOAD LOGIC ────────────────────────────────
@@ -302,10 +357,6 @@ function initPolling() {
 async function updateStatus() {
     try {
         const data = await apiRequest('/status');
-        const emailInput = document.getElementById('alert-email');
-        if (emailInput && document.activeElement !== emailInput) {
-            emailInput.value = data.alert_recipient || "";
-        }
         
         const eventData = await apiRequest('/events?limit=100');
         const events = eventData.events || [];
@@ -724,13 +775,6 @@ document.addEventListener('DOMContentLoaded', () => {
                 .catch(() => showToast("Failed to trigger AI Agent", "error"));
         };
     });
-
-    document.getElementById('btn-save-email').onclick = () => {
-        const email = document.getElementById('alert-email').value;
-        apiRequest(`/settings/alert-recipient?email=${email}`, 'POST', null, true)
-            .then(() => showToast("Alert recipient updated", "success"))
-            .catch(() => showToast("Failed to update recipient", "error"));
-    };
 
     // New functional listeners
     document.getElementById('btn-refresh-stats').onclick = () => {
