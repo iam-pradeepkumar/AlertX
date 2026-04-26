@@ -42,8 +42,8 @@ def send_email(subject, message, image_data=None):
         msg['To'] = recipient_email
         msg['Subject'] = f"AlertX Security: {subject}"
 
-        # Attach text
-        msg.attach(MIMEText(message, 'plain'))
+        # Attach HTML text
+        msg.attach(MIMEText(message, 'html'))
 
         # Attach image if provided
         if image_data:

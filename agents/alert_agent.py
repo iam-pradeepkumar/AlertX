@@ -121,15 +121,43 @@ class AlertAgent(BaseAgent):
                         logger.error(f"Image Encoding Error: {ie}")
 
                 # ── DISPATCH ──────────────────────────────
-                alert_msg = f"--- ALERTX SECURITY ALERT ---\n\n"
-                alert_msg += f"Incident: {incident_type}\n"
-                alert_msg += f"Priority: {priority}\n"
-                alert_msg += f"Time: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}\n"
-                alert_msg += f"Source: {source_name}\n"
                 summary = data.get("high_priority_summary") or inc.get("summary", "No details")
-                alert_msg += f"Summary: {summary}\n"
-                alert_msg += "\n-----------------------------\n"
-                alert_msg += "View live at: " + main_module.PUBLIC_URL + "\n"
+                
+                alert_msg = f"""
+                <html>
+                    <body style="font-family: Arial, sans-serif; background-color: #f4f4f5; padding: 20px;">
+                        <div style="max-width: 600px; margin: 0 auto; background: white; border-radius: 8px; overflow: hidden; box-shadow: 0 4px 6px rgba(0,0,0,0.1);">
+                            <div style="background-color: #ef4444; color: white; padding: 15px; text-align: center;">
+                                <h2 style="margin: 0;">🚨 ALERTX SECURITY WARNING</h2>
+                            </div>
+                            <div style="padding: 20px; color: #1f2937;">
+                                <h3 style="margin-top: 0;">Incident: {incident_type}</h3>
+                                <p style="margin: 5px 0;"><strong>Priority:</strong> <span style="color: #ef4444; font-weight: bold;">{priority}</span></p>
+                                <p style="margin: 5px 0;"><strong>Time:</strong> {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}</p>
+                                <p style="margin: 5px 0;"><strong>Source:</strong> {source_name}</p>
+                                
+                                <div style="background-color: #fef2f2; padding: 15px; border-left: 4px solid #ef4444; margin: 20px 0; border-radius: 0 4px 4px 0;">
+                                    <strong>AI Analysis:</strong> {summary}
+                                </div>
+                                
+                                <div style="margin-top: 30px;">
+                                    <h4 style="margin-bottom: 15px; text-align: center; color: #4b5563;">⚡ Voice Agent Dispatch</h4>
+                                    <div style="text-align: center;">
+                                        <a href="{main_module.PUBLIC_URL}/dispatch/police" style="display: inline-block; padding: 12px 15px; margin: 5px; background-color: #ef4444; color: white; text-decoration: none; border-radius: 5px; font-weight: bold; width: 140px;">Call Police</a>
+                                        <a href="{main_module.PUBLIC_URL}/dispatch/security" style="display: inline-block; padding: 12px 15px; margin: 5px; background-color: #f59e0b; color: white; text-decoration: none; border-radius: 5px; font-weight: bold; width: 140px;">Call Security</a>
+                                        <a href="{main_module.PUBLIC_URL}/dispatch/ambulance" style="display: inline-block; padding: 12px 15px; margin: 5px; background-color: #3b82f6; color: white; text-decoration: none; border-radius: 5px; font-weight: bold; width: 140px;">Call Ambulance</a>
+                                    </div>
+                                </div>
+                                
+                                <p style="margin-top: 30px; text-align: center; font-size: 13px; color: #6b7280; border-top: 1px solid #e5e7eb; padding-top: 15px;">
+                                    View live camera stream at <br>
+                                    <a href="{main_module.PUBLIC_URL}" style="color: #3b82f6;">{main_module.PUBLIC_URL}</a>
+                                </p>
+                            </div>
+                        </div>
+                    </body>
+                </html>
+                """
 
                 logger.info(f"📧 Sending Email Alert for {incident_type}...")
                 success = send_email(
