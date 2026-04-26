@@ -291,5 +291,9 @@ class AlertXEnsemble:
         if area1 + area2 - area_i == 0: return 0
         return area_i / min(area1, area2)
 
+    @property
+    def is_loaded(self) -> bool:
+        return self._loaded
+
 # Compatibility Alias
 YOLODetector = AlertXEnsemble
