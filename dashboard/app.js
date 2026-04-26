@@ -115,6 +115,7 @@ function logout() {
     document.getElementById('app-shell').classList.add('hidden');
     document.getElementById('auth-overlay').classList.add('active');
     
+    showToast("Session terminated. Secure logout complete.", "info");
     isLoggingOut = false;
 }
 
@@ -155,11 +156,17 @@ function switchView(viewName) {
     document.querySelectorAll('.view').forEach(v => v.classList.remove('active'));
     document.querySelectorAll('.nav-item').forEach(n => n.classList.remove('active'));
     
-    document.getElementById(`view-${viewName}`).classList.add('active');
-    document.querySelector(`[data-view="${viewName}"]`).classList.add('active');
+    const viewEl = document.getElementById(`view-${viewName}`);
+    const navEl = document.querySelector(`[data-view="${viewName}"]`);
+    
+    if (viewEl) viewEl.classList.add('active');
+    if (navEl) navEl.classList.add('active');
     
     // Close sidebar on mobile after navigating
     closeSidebar();
+    
+    const viewTitle = viewName.charAt(0).toUpperCase() + viewName.slice(1).replace('-', ' ');
+    showToast(`Accessing: ${viewTitle} Control Panel`, "info");
     
     if (viewName === 'live-map') {
         initMap();
@@ -257,9 +264,11 @@ async function findNearbyServices(pos) {
         
         if (!data.elements || data.elements.length === 0) {
             container.innerHTML = '<p style="text-align:center; color:#8b8ba3;">No verified units in sector.</p>';
+            showToast("No emergency units detected within 5km radius.", "info");
             return;
         }
 
+        showToast(`Intelligence sync: ${data.elements.length} units identified in sector.`, "success");
         // Calculate rough distance helper
         const calcDist = (lat1, lon1, lat2, lon2) => {
             const R = 6371; // km
@@ -771,6 +780,8 @@ async function stopFeed() {
 
 function showToast(message, type = "info") {
     const container = document.getElementById('toast-container');
+    if (!container) return;
+
     const toast = document.createElement('div');
     toast.className = `toast toast--${type}`;
     toast.textContent = message;
@@ -778,8 +789,10 @@ function showToast(message, type = "info") {
     
     setTimeout(() => {
         toast.style.opacity = '0';
+        toast.style.transform = 'translateX(50px) scale(0.9)';
+        toast.style.transition = 'all 0.4s ease';
         setTimeout(() => toast.remove(), 400);
-    }, 4000);
+    }, 4500);
 }
 
 // ── LISTENERS ────────────────────────────────────
