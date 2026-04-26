@@ -23,4 +23,6 @@ ftfy
 regex
 firebase-admin
 sendgrid
+google-api-python-client
+google-auth-oauthlib
 clip @ git+https://github.com/openai/CLIP.git

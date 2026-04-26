@@ -1,31 +1,44 @@
-import smtplib
+import base64
 import os
 import logging
 from email.mime.text import MIMEText
 from email.mime.multipart import MIMEMultipart
 from email.mime.image import MIMEImage
 
+from google.oauth2.credentials import Credentials
+from googleapiclient.discovery import build
+from googleapiclient.errors import HttpError
+
 logger = logging.getLogger("alertx.email")
 
 def send_email(subject, message, image_data=None):
-    """Sends an email using Gmail App Password (SMTP)."""
-    # ── SETTINGS ─────────────────────────────────
-    smtp_server = "smtp.gmail.com"
-    smtp_port = 465 # SSL Mode
+    """Sends an email using the official Gmail REST API (Bypasses SMTP blocks)."""
     
-    # These must be set in your Secrets/Env
-    sender_email = os.getenv("MAIL_USERNAME")
-    app_password = os.getenv("MAIL_PASSWORD") # This is your 16-character App Password
-    recipient_email = os.getenv("MAIL_RECIPIENT") # Fixed recipient
+    # ── CREDENTIALS ─────────────────────────────────
+    # These must be set in Hugging Face Secrets
+    client_id = os.getenv("GMAIL_CLIENT_ID")
+    client_secret = os.getenv("GMAIL_CLIENT_SECRET")
+    refresh_token = os.getenv("GMAIL_REFRESH_TOKEN")
+    recipient_email = os.getenv("MAIL_RECIPIENT")
     
-    if not sender_email or not app_password or not recipient_email:
-        logger.error("Email Error: MAIL_USERNAME, MAIL_PASSWORD, or MAIL_RECIPIENT missing!")
+    if not all([client_id, client_secret, refresh_token, recipient_email]):
+        logger.error("Email Error: Missing Gmail API Secrets! (CLIENT_ID, CLIENT_SECRET, REFRESH_TOKEN, or RECIPIENT)")
         return False
 
     try:
-        # Create message
+        # 1. Authenticate via OAuth2
+        creds = Credentials(
+            token=None,
+            refresh_token=refresh_token,
+            client_id=client_id,
+            client_secret=client_secret,
+            token_uri="https://oauth2.googleapis.com/token"
+        )
+        
+        service = build('gmail', 'v1', credentials=creds, cache_discovery=False)
+
+        # 2. Construct the Email
         msg = MIMEMultipart()
-        msg['From'] = sender_email
         msg['To'] = recipient_email
         msg['Subject'] = f"AlertX Security: {subject}"
 
@@ -41,25 +54,20 @@ def send_email(subject, message, image_data=None):
             except Exception as ie:
                 logger.error(f"Image Attachment Error: {ie}")
 
-        # Send with a strict timeout to prevent hanging on cloud providers
-        with smtplib.SMTP_SSL(smtp_server, smtp_port, timeout=5) as server:
-            server.login(sender_email, app_password)
-            server.send_message(msg)
-            
-        logger.info(f"✅ Email Alert sent successfully to {recipient_email}")
+        # 3. Encode the message for the Gmail API
+        raw_message = base64.urlsafe_b64encode(msg.as_bytes()).decode()
+        body = {'raw': raw_message}
+
+        # 4. Send via HTTP
+        logger.info("Sending email via Gmail REST API...")
+        sent_message = service.users().messages().send(userId="me", body=body).execute()
+        
+        logger.info(f"✅ Email Alert sent successfully! Message ID: {sent_message.get('id')}")
         return True
 
+    except HttpError as error:
+        logger.error(f"❌ Gmail API Error: {error}")
+        return False
     except Exception as e:
-        logger.error(f"❌ SMTP SSL Error: {e}")
-        # Fallback to Port 587 if 465 fails
-        try:
-            logger.info("Retrying with Port 587 (TLS)...")
-            with smtplib.SMTP(smtp_server, 587, timeout=5) as server:
-                server.starttls()
-                server.login(sender_email, app_password)
-                server.send_message(msg)
-            logger.info(f"✅ Email Alert sent via TLS to {recipient_email}")
-            return True
-        except Exception as e2:
-            logger.error(f"❌ All SMTP attempts failed: {e2}")
-            return False
+        logger.error(f"❌ Unexpected Error during email dispatch: {e}")
+        return False
