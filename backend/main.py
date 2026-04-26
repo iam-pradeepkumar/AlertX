@@ -19,6 +19,8 @@ import cv2
 import numpy as np
 from fastapi import FastAPI, File, UploadFile, HTTPException, Query, Depends, Response
 from fastapi.responses import StreamingResponse, JSONResponse, HTMLResponse, FileResponse
+import urllib3
+urllib3.disable_warnings(urllib3.exceptions.InsecureRequestWarning)
 from fastapi.staticfiles import StaticFiles
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.security import OAuth2PasswordRequestForm
@@ -236,9 +238,8 @@ async def get_events(limit: int = 50, incident_type: str = None, db: Session = D
             
         # Also include recent memory events if DB is empty
         if not formatted:
-            mem_events = event_store.get_recent(limit)
-            for me in mem_events:
-                formatted.append(me.to_dict())
+            mem_events = event_store.get_events(limit)
+            formatted = mem_events
         
         return {"status": "success", "events": formatted}
     except Exception as err:
@@ -316,11 +317,20 @@ def _bg_agent_task(frame_result, source, frame_index, recipient):
                 # Save to persistent DB
                 db = SessionLocal()
                 try:
+                    # Get priority from the first high-priority incident
+                    top_priority = "MEDIUM"
+                    for i in frame_result.incidents:
+                        if i.get("severity_score", 0) > 0.8:
+                            top_priority = "CRITICAL"
+                            break
+                        elif i.get("severity_score", 0) > 0.6:
+                            top_priority = "HIGH"
+                            
                     for inc in frame_result.incidents:
                         new_event = Event(
                             incident_type=inc.get("type", "unknown"),
                             confidence=float(inc.get("confidence", 0.0)),
-                            priority=data.get("priority", "MEDIUM"),
+                            priority=inc.get("priority", top_priority),
                             source=source,
                             description=data.get("high_priority_summary", ""),
                             screenshot_path=frame_result.screenshot_path
