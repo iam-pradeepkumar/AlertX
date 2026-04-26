@@ -90,17 +90,30 @@ class AlertAgent(BaseAgent):
                 source_name = data.get("source", "live")
                 incident_type = itype
                 priority = prio
-                
-                # Use standard SMTP with App Password
+                description = data.get("high_priority_summary", inc.get("summary", ""))
+
+                # Construct the message
+                alert_msg = f"--- ALERTX SECURITY ALERT ---\n\n"
+                alert_msg += f"Incident: {incident_type.upper()}\n"
+                alert_msg += f"Priority: {priority}\n"
+                alert_msg += f"Time: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}\n"
+                alert_msg += f"Source: {source_name}\n"
+                if description:
+                    alert_msg += f"Summary: {description}\n"
+                alert_msg += "\n-----------------------------\n"
+                alert_msg += "View live at: " + main_module.PUBLIC_URL + "\n"
+
+                # NOW Send via standard SMTP
                 success = send_email(
                     subject=f"{incident_type.upper()} Detected!",
                     message=alert_msg,
                     image_data=image_bytes
                 )
+                
                 if source_name == "live":
-                    if now - self._last_alert_time.get(incident_type, 0) >= ALERT_COOLDOWN:
+                    if time.time() - self._last_alert_time.get(incident_type, 0) >= ALERT_COOLDOWN:
                         can_alert = True
-                        self._last_alert_time[incident_type] = now
+                        self._last_alert_time[incident_type] = time.time()
                 else:
                     # For uploaded files: Only alert ONCE per file ever
                     if source_name not in self._alerted_files:
@@ -116,7 +129,7 @@ class AlertAgent(BaseAgent):
                     
                     # Dispatch email with dynamic recipient override
                     recipient = data.get("recipient_override")
-                    send_email_api(subject, body, frame=evidence_frame, recipient=recipient)
+                    send_email(subject, body, frame=evidence_frame)
 
         data["alerts_dispatched"] = alerts_dispatched
         self._processed_count += 1
