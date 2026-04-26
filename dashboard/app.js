@@ -183,14 +183,19 @@ function initMap() {
     if (map) return;
     
     map = L.map('map').setView(userPos, 13);
-    L.tileLayer('https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png', {
-        attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors &copy; <a href="https://carto.com/attributions">CARTO</a>',
-        subdomains: 'abcd',
-        maxZoom: 20
+    
+    // Real Satellite View (Esri World Imagery)
+    L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}', {
+        attribution: 'Tiles &copy; Esri &mdash; Source: Esri, i-cubed, USDA, USGS, AEX, GeoEye, Getmapping, Aerogrid, IGN, IGP, UPR-EBP, and the GIS User Community'
     }).addTo(map);
 
-    // Dark mode map filter
-    document.querySelector('.leaflet-container').style.filter = "invert(100%) hue-rotate(180deg) brightness(95%) contrast(90%)";
+    // Overlay for labels (OpenStreetMap Hybrid)
+    L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+        opacity: 0.5,
+        className: 'map-labels-overlay'
+    }).addTo(map);
+
+    window.serviceMarkers = [];
 
     // Detect user location
     const defaultFallback = () => {
@@ -238,9 +243,8 @@ async function findNearbyServices(pos) {
 
     const lat = pos[0];
     const lon = pos[1];
-    const radius = 10000; // Increased to 10km for better coverage
+    const radius = 10000; // 10km
 
-    // Comprehensive Overpass query for emergency services
     const query = `
         [out:json][timeout:25];
         (
@@ -255,56 +259,65 @@ async function findNearbyServices(pos) {
             method: "POST",
             body: query
         });
-        
-        if (!response.ok) throw new Error("Overpass API failed");
-        
         const data = await response.json();
         
         if (!data.elements || data.elements.length === 0) {
             container.innerHTML = '<p style="text-align:center; color:#8b8ba3;">No verified units in sector.</p>';
-            showToast("No emergency units detected within 5km radius.", "info");
             return;
         }
 
-        // Calculate rough distance helper
+        // Clear old markers
+        if (window.serviceMarkers) {
+            window.serviceMarkers.forEach(m => map.removeLayer(m));
+            window.serviceMarkers = [];
+        }
+
         const calcDist = (lat1, lon1, lat2, lon2) => {
-            const R = 6371; // km
+            const R = 6371;
             const dLat = (lat2-lat1) * Math.PI / 180;
             const dLon = (lon2-lon1) * Math.PI / 180;
-            const a = Math.sin(dLat/2) * Math.sin(dLat/2) +
-                      Math.cos(lat1 * Math.PI / 180) * Math.cos(lat2 * Math.PI / 180) *
-                      Math.sin(dLon/2) * Math.sin(dLon/2);
+            const a = Math.sin(dLat/2) * Math.sin(dLat/2) + Math.cos(lat1*Math.PI/180)*Math.cos(lat2*Math.PI/180)*Math.sin(dLon/2)*Math.sin(dLon/2);
             return R * (2 * Math.atan2(Math.sqrt(a), Math.sqrt(1-a)));
         };
 
         const services = data.elements.map(el => {
-            const type = el.tags.amenity || 'unknown';
+            const elLat = el.lat || el.center.lat;
+            const elLon = el.lon || el.center.lon;
+            const type = el.tags.amenity || 'emergency';
+            const name = el.tags.name || `Verified ${type.replace('_', ' ')}`;
             let icon = '🛡️';
             if (type === 'police') icon = '🚓';
-            if (type === 'hospital') icon = '🚑';
+            if (type.includes('hospital') || type.includes('ambulance')) icon = '🏥';
             if (type === 'fire_station') icon = '🚒';
-            
-            const dist = calcDist(lat, lon, el.lat, el.lon).toFixed(1) + "km";
-            const name = el.tags.name || `Local ${type.charAt(0).toUpperCase() + type.slice(1).replace('_', ' ')}`;
-            
-            return { name, type: type.replace('_', ' '), dist, icon };
+            if (type === 'doctor') icon = '👨‍⚕️';
+
+            // Add Marker to map
+            const marker = L.marker([elLat, elLon]).addTo(map)
+                .bindPopup(`<b>${icon} ${name}</b><br>${type.toUpperCase()} UNIT`);
+            window.serviceMarkers.push(marker);
+
+            return {
+                name,
+                type: type.replace('_', ' '),
+                dist: calcDist(lat, lon, elLat, elLon).toFixed(1) + "km",
+                icon
+            };
         });
 
-        // Sort by distance roughly
         services.sort((a, b) => parseFloat(a.dist) - parseFloat(b.dist));
 
         container.innerHTML = services.map(s => `
-            <div class="service-card" style="display: flex; align-items: center; background: rgba(255,255,255,0.05); padding: 10px; border-radius: 8px; border: 1px solid rgba(255,255,255,0.1);">
-                <div class="service-icon" style="font-size: 1.5rem; margin-right: 15px; background: rgba(0,0,0,0.3); width: 40px; height: 40px; display: flex; align-items: center; justify-content: center; border-radius: 8px;">${s.icon}</div>
-                <div class="service-info">
-                    <h4 style="margin: 0; font-size: 0.9rem;">${s.name}</h4>
-                    <p style="margin: 3px 0 0; font-size: 0.75rem; color: #8b8ba3; text-transform: uppercase;">${s.type} • <span style="color:#4ade80">${s.dist}</span></p>
+            <div class="service-card" style="display: flex; align-items: center; background: rgba(255,255,255,0.05); padding: 10px; border-radius: 8px; margin-bottom: 8px; border: 1px solid rgba(255,255,255,0.1);">
+                <div style="font-size: 1.2rem; margin-right: 12px;">${s.icon}</div>
+                <div>
+                    <div style="font-size: 0.85rem; font-weight: 600;">${s.name}</div>
+                    <div style="font-size: 0.7rem; color: #8b8ba3; text-transform: uppercase;">${s.type} • <span style="color:var(--online)">${s.dist}</span></div>
                 </div>
             </div>
         `).join('');
 
     } catch (e) {
-        console.error("AlertX: Failed to fetch real geo-intelligence:", e);
+        console.error(e);
         container.innerHTML = '<p style="text-align:center; color:#ef4444;">Geo-sync offline.</p>';
     }
 }
@@ -437,7 +450,16 @@ async function updateEvents() {
         const events = data.events || [];
         
         const container = document.getElementById('event-list');
+        const header = document.querySelector('.events-section h3');
         
+        if (filterVal) {
+            const [prefix, value] = filterVal.split(':');
+            const label = value.toUpperCase();
+            header.innerHTML = `Activity Log <span style="font-size: 0.65rem; color: var(--accent); background: var(--accent-glow); padding: 2px 6px; border-radius: 4px; margin-left: 8px;">Filter: ${label}</span>`;
+        } else {
+            header.innerHTML = `Activity Log`;
+        }
+
         if (events.length === 0) {
             container.innerHTML = `<li style="padding: 2rem; text-align: center; color: var(--text-secondary);">No events found matching the current filter.</li>`;
             return;
