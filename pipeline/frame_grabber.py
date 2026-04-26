@@ -43,37 +43,39 @@ class FrameGrabber:
                 import yt_dlp
                 logger.info(f"Extracting YouTube stream: {self.source}")
                 ydl_opts = {
-                    'format': 'best[ext=mp4]/best', # Prioritize standard mp4/hls for OpenCV
+                    'format': 'best', 
                     'quiet': True,
                     'no_warnings': True,
                     'noplaylist': True,
-                    'extract_flat': False,
-                    'skip_download': True,
-                    # Impersonate mobile browser to bypass bot detection
-                    'user_agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
+                    'nocheckcertificate': True,
+                    # iOS Client is often less restricted than Web/Android
+                    'user_agent': 'Mozilla/5.0 (iPhone; CPU iPhone OS 17_0 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/17.0 Mobile/15E148 Safari/604.1',
                     'extractor_args': {
                         'youtube': {
-                            'player_client': ['android', 'web'],
-                            'skip': ['hls', 'dash'] # Let yt-dlp pick the best available direct link
+                            'player_client': ['ios'],
                         }
-                    }
+                    },
+                    'youtube_include_dash_manifest': False,
+                    'youtube_include_hls_manifest': True,
+                    'referer': 'https://www.youtube.com/',
                 }
                 with yt_dlp.YoutubeDL(ydl_opts) as ydl:
                     info = ydl.extract_info(self.source, download=False)
-                    # Try to get the direct stream URL (m3u8 is usually best for live)
                     actual_source = info.get('url')
-                    if not actual_source and 'formats' in info:
-                        # Fallback: look for m3u8 formats manually
-                        for f in info['formats']:
-                            if f.get('protocol') == 'm3u8_native' or '.m3u8' in f.get('url', ''):
-                                actual_source = f['url']
-                                break
                     
                     if actual_source:
-                        logger.info("Successfully extracted YouTube stream URL.")
+                        logger.info("Successfully extracted YouTube stream via iOS client.")
                     else:
-                        logger.warning("No direct stream URL found, falling back to raw source.")
-                        actual_source = self.source
+                        # Secondary fallback: check all formats for m3u8
+                        if 'formats' in info:
+                            for f in info['formats']:
+                                if '.m3u8' in f.get('url', ''):
+                                    actual_source = f['url']
+                                    break
+                
+                if not actual_source:
+                    logger.warning("No direct stream URL found.")
+                    actual_source = self.source
             except Exception as e:
                 logger.error(f"YouTube extraction failed: {e}")
                 actual_source = self.source
