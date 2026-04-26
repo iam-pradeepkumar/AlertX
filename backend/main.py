@@ -213,18 +213,18 @@ async def download_db(current_user: str = Depends(get_current_user)):
 
 @app.get("/events")
 async def get_events(limit: int = 50, incident_type: str = None, db: Session = Depends(get_db), current_user: str = Depends(get_current_user)):
-    """Fetch persistent events from the SQLite database."""
+    """Fetch events (Hybird: DB + Recent Memory)."""
     try:
+        # Get from DB
         query = db.query(Event)
         if incident_type:
             query = query.filter(Event.incident_type == incident_type)
-        events = query.order_by(Event.timestamp.desc()).limit(limit).all()
+        db_events = query.order_by(Event.timestamp.desc()).limit(limit).all()
         
-        # Format for frontend (Legacy support)
-        # The dashboard expects a list of dictionaries with specific keys
-        formatted_events = []
-        for e in events:
-            formatted_events.append({
+        # Format
+        formatted = []
+        for e in db_events:
+            formatted.append({
                 "id": e.id,
                 "timestamp": e.timestamp.isoformat(),
                 "incident_type": e.incident_type,
@@ -233,8 +233,14 @@ async def get_events(limit: int = 50, incident_type: str = None, db: Session = D
                 "description": e.description,
                 "source": e.source
             })
+            
+        # Also include recent memory events if DB is empty
+        if not formatted:
+            mem_events = event_store.get_recent(limit)
+            for me in mem_events:
+                formatted.append(me.to_dict())
         
-        return {"status": "success", "events": formatted_events}
+        return {"status": "success", "events": formatted}
     except Exception as err:
         logger.error(f"Event Fetch Error: {err}")
         return {"status": "error", "events": []}
@@ -292,25 +298,42 @@ def _bg_agent_task(frame_result, source, frame_index, recipient):
             
         # ── PERSIST TO DATABASE ──────────────────────
         if frame_result.incidents:
-            db = SessionLocal()
             try:
-                from backend.models import Event as DBEvent
+                # Add to in-memory store for instant dashboard view
+                from backend.event_store import Event as MemoryEvent
                 for inc in frame_result.incidents:
-                    new_event = DBEvent(
+                    mem_event = MemoryEvent(
                         incident_type=inc.get("type", "unknown"),
-                        confidence=float(inc.get("confidence", 0.0)),
+                        severity=inc.get("severity_label", "MEDIUM"),
                         priority=data.get("priority", "MEDIUM"),
+                        confidence=float(inc.get("confidence", 0.0)),
+                        details=data.get("high_priority_summary", ""),
                         source=source,
-                        description=data.get("high_priority_summary", ""),
-                        screenshot_path=frame_result.screenshot_path
+                        frame_index=frame_index
                     )
-                    db.add(new_event)
-                db.commit()
-                logger.info(f"Database: Saved {len(frame_result.incidents)} incidents.")
-            except Exception as dbe:
-                logger.error(f"Database Save Error: {dbe}")
-            finally:
-                db.close()
+                    event_store.add_event(mem_event)
+                
+                # Save to persistent DB
+                db = SessionLocal()
+                try:
+                    for inc in frame_result.incidents:
+                        new_event = Event(
+                            incident_type=inc.get("type", "unknown"),
+                            confidence=float(inc.get("confidence", 0.0)),
+                            priority=data.get("priority", "MEDIUM"),
+                            source=source,
+                            description=data.get("high_priority_summary", ""),
+                            screenshot_path=frame_result.screenshot_path
+                        )
+                        db.add(new_event)
+                    db.commit()
+                    logger.info(f"Database: Saved {len(frame_result.incidents)} incidents.")
+                except Exception as dbe:
+                    logger.error(f"Database Save Error: {dbe}")
+                finally:
+                    db.close()
+            except Exception as e_mem:
+                logger.error(f"Event Store Error: {e_mem}")
             
         # ── TRIGGER ALERTS ──────────────────────────
         # Ensure alert_agent runs even if DB fails
