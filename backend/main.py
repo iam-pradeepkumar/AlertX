@@ -18,7 +18,7 @@ from io import BytesIO
 import cv2
 import numpy as np
 from fastapi import FastAPI, File, UploadFile, HTTPException, Query, Depends, Response
-from fastapi.responses import StreamingResponse, JSONResponse, HTMLResponse
+from fastapi.responses import StreamingResponse, JSONResponse, HTMLResponse, FileResponse
 from fastapi.staticfiles import StaticFiles
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.security import OAuth2PasswordRequestForm
@@ -200,6 +200,16 @@ async def login(form_data: OAuth2PasswordRequestForm = Depends(), db: Session = 
     
     access_token = create_access_token(data={"sub": user.username})
     return {"access_token": access_token, "token_type": "bearer"}
+
+from fastapi.responses import StreamingResponse, JSONResponse, HTMLResponse, FileResponse
+
+@app.get("/download/db")
+async def download_db(current_user: str = Depends(get_current_user)):
+    """Allow downloading the SQLite database file for forensic analysis."""
+    db_path = "alertx.db"
+    if os.path.exists(db_path):
+        return FileResponse(db_path, filename="alertx_forensics.db")
+    raise HTTPException(status_code=404, detail="Database file not found")
 
 @app.get("/events")
 async def get_events(limit: int = 50, incident_type: str = None, db: Session = Depends(get_db), current_user: str = Depends(get_current_user)):
