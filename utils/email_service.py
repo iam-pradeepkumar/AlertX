@@ -41,8 +41,8 @@ def send_email(subject, message, image_data=None):
             except Exception as ie:
                 logger.error(f"Image Attachment Error: {ie}")
 
-        # Send
-        with smtplib.SMTP_SSL(smtp_server, smtp_port) as server:
+        # Send with a strict timeout to prevent hanging on cloud providers
+        with smtplib.SMTP_SSL(smtp_server, smtp_port, timeout=5) as server:
             server.login(sender_email, app_password)
             server.send_message(msg)
             
@@ -50,11 +50,11 @@ def send_email(subject, message, image_data=None):
         return True
 
     except Exception as e:
-        logger.error(f"❌ SMTP Error: {e}")
+        logger.error(f"❌ SMTP SSL Error: {e}")
         # Fallback to Port 587 if 465 fails
         try:
             logger.info("Retrying with Port 587 (TLS)...")
-            with smtplib.SMTP(smtp_server, 587) as server:
+            with smtplib.SMTP(smtp_server, 587, timeout=5) as server:
                 server.starttls()
                 server.login(sender_email, app_password)
                 server.send_message(msg)
