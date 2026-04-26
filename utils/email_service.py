@@ -1,86 +1,65 @@
 import smtplib
+import os
 import logging
-import cv2
 from email.mime.text import MIMEText
 from email.mime.multipart import MIMEMultipart
 from email.mime.image import MIMEImage
-from backend.config import MAIL_SERVER, MAIL_PORT, MAIL_USERNAME, MAIL_PASSWORD, MAIL_RECIPIENT, PUBLIC_URL
 
 logger = logging.getLogger("alertx.email")
 
-def send_email_alert(subject: str, body: str, frame=None, recipient: str = None):
-    """
-    Sends an email alert using SMTP. 
-    If a frame is provided, it is attached as an image.
-    """
-    target_email = recipient or MAIL_RECIPIENT
+def send_email(subject, message, image_data=None):
+    """Sends an email using Gmail App Password (SMTP)."""
+    # ── SETTINGS ─────────────────────────────────
+    smtp_server = "smtp.gmail.com"
+    smtp_port = 465 # SSL Mode
     
-    if not MAIL_USERNAME or not MAIL_PASSWORD or not target_email:
-        logger.warning(f"[STUB] Email Alert: {subject} - Credentials/Recipient missing.")
+    # These must be set in your Secrets/Env
+    sender_email = os.getenv("MAIL_USERNAME")
+    app_password = os.getenv("MAIL_PASSWORD") # This is your 16-character App Password
+    recipient_email = os.getenv("MAIL_RECIPIENT") # Fixed recipient
+    
+    if not sender_email or not app_password or not recipient_email:
+        logger.error("Email Error: MAIL_USERNAME, MAIL_PASSWORD, or MAIL_RECIPIENT missing!")
         return False
 
     try:
-        msg = MIMEMultipart('related')
-        msg['From'] = MAIL_USERNAME
-        msg['To'] = target_email
-        msg['Subject'] = f"🛡️ AlertX: {subject}"
+        # Create message
+        msg = MIMEMultipart()
+        msg['From'] = sender_email
+        msg['To'] = recipient_email
+        msg['Subject'] = f"AlertX Security: {subject}"
 
-        # HTML Body with Buttons
-        html_content = f"""
-        <html>
-        <body style="font-family: Arial, sans-serif; color: #333; line-height: 1.6;">
-            <div style="max-width: 600px; margin: 0 auto; border: 1px solid #ddd; border-radius: 8px; overflow: hidden;">
-                <div style="background: #1a1a2e; color: white; padding: 20px; text-align: center;">
-                    <h1 style="margin: 0; font-size: 24px;">🚨 AlertX Security Alert</h1>
-                </div>
-                <div style="padding: 20px;">
-                    <h2 style="color: #e94560;">{subject}</h2>
-                    <p>{body.replace('\\n', '<br>')}</p>
-                    
-                    <div style="margin: 30px 0; padding: 20px; background: #f9f9f9; border-radius: 8px; text-align: center;">
-                        <h3 style="margin-top: 0;">⚡ AI Autonomous Dispatch</h3>
-                        <p style="font-size: 14px; color: #666;">Click to trigger AI Voice Agent to call emergency services:</p>
-                        
-                        <div style="display: flex; justify-content: center; gap: 10px; flex-wrap: wrap;">
-                            <a href="{PUBLIC_URL}/dispatch/police" style="display: inline-block; padding: 12px 20px; background: #3b82f6; color: white; text-decoration: none; border-radius: 5px; font-weight: bold; margin: 5px;">🤖 Dispatch Police</a>
-                            <a href="{PUBLIC_URL}/dispatch/ambulance" style="display: inline-block; padding: 12px 20px; background: #ef4444; color: white; text-decoration: none; border-radius: 5px; font-weight: bold; margin: 5px;">🤖 Dispatch Ambulance</a>
-                            <a href="{PUBLIC_URL}/dispatch/fire" style="display: inline-block; padding: 12px 20px; background: #f59e0b; color: white; text-decoration: none; border-radius: 5px; font-weight: bold; margin: 5px;">🤖 Dispatch Fire</a>
-                        </div>
-                    </div>
-                    
-                    <p style="font-size: 12px; color: #999;">This is an automated AI alert from your AlertX Surveillance System.</p>
-                </div>
-            </div>
-        </body>
-        </html>
-        """
-        msg.attach(MIMEText(html_content, 'html'))
+        # Attach text
+        msg.attach(MIMEText(message, 'plain'))
 
-        # Attach image frame if provided
-        if frame is not None:
-            _, buffer = cv2.imencode('.jpg', frame)
-            image_attachment = MIMEImage(buffer.tobytes(), name="incident_evidence.jpg")
-            msg.attach(image_attachment)
+        # Attach image if provided
+        if image_data:
+            try:
+                img = MIMEImage(image_data)
+                img.add_header('Content-Disposition', 'attachment', filename="incident.jpg")
+                msg.attach(img)
+            except Exception as ie:
+                logger.error(f"Image Attachment Error: {ie}")
 
-        # Connect and send
-        logger.info(f"Connecting to {MAIL_SERVER}:465 (SSL Mode)...")
-        try:
-            with smtplib.SMTP_SSL(MAIL_SERVER, 465, timeout=15) as server:
-                logger.info(f"SMTP Login for {MAIL_USERNAME}...")
-                server.login(MAIL_USERNAME, MAIL_PASSWORD)
-                server.send_message(msg)
-                
-            logger.info(f"✅ SUCCESS: Email alert sent to {target_email}")
-            return True
-        except Exception as smtp_err:
-            logger.error(f"SMTP SSL Failed, trying fallback port 587... Error: {smtp_err}")
-            with smtplib.SMTP(MAIL_SERVER, 587, timeout=15) as server:
-                server.starttls()
-                server.login(MAIL_USERNAME, MAIL_PASSWORD)
-                server.send_message(msg)
-            logger.info(f"✅ SUCCESS: Email alert sent via Fallback Port 587")
-            return True
+        # Send
+        with smtplib.SMTP_SSL(smtp_server, smtp_port) as server:
+            server.login(sender_email, app_password)
+            server.send_message(msg)
+            
+        logger.info(f"✅ Email Alert sent successfully to {recipient_email}")
+        return True
 
     except Exception as e:
-        logger.error(f"Failed to send email alert: {e}")
-        return False
+        logger.error(f"❌ SMTP Error: {e}")
+        # Fallback to Port 587 if 465 fails
+        try:
+            logger.info("Retrying with Port 587 (TLS)...")
+            with smtplib.SMTP(smtp_server, 587) as server:
+                server.starttls()
+                server.login(sender_email, app_password)
+                server.send_message(msg)
+            logger.info(f"✅ Email Alert sent via TLS to {recipient_email}")
+            return True
+        except Exception as e2:
+            logger.error(f"❌ All SMTP attempts failed: {e2}")
+            return False

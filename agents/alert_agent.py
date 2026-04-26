@@ -11,7 +11,7 @@ from typing import Any, Dict
 from agents.base_agent import BaseAgent
 from backend.config import ALERT_COOLDOWN
 from backend.event_store import Event, EventStore
-from utils.email_api import send_email_api
+from utils.email_service import send_email
 from utils.image_host import upload_frame
 # Import for updating global context
 import backend.main as main_module
@@ -91,6 +91,12 @@ class AlertAgent(BaseAgent):
                 incident_type = itype
                 priority = prio
                 
+                # Use standard SMTP with App Password
+                success = send_email(
+                    subject=f"{incident_type.upper()} Detected!",
+                    message=alert_msg,
+                    image_data=image_bytes
+                )
                 if source_name == "live":
                     if now - self._last_alert_time.get(incident_type, 0) >= ALERT_COOLDOWN:
                         can_alert = True
