@@ -1,5 +1,6 @@
-from sqlalchemy import Column, Integer, String, Boolean, create_engine
+from sqlalchemy import Column, Integer, String, Boolean, Float, DateTime, create_engine
 from sqlalchemy.orm import sessionmaker, declarative_base
+from datetime import datetime
 
 # Database setup
 SQLALCHEMY_DATABASE_URL = "sqlite:///./alertx.db"
@@ -15,6 +16,18 @@ class User(Base):
     email = Column(String, unique=True, index=True)
     hashed_password = Column(String)
     is_active = Column(Boolean, default=True)
+
+class Event(Base):
+    __tablename__ = "events"
+
+    id = Column(Integer, primary_key=True, index=True)
+    timestamp = Column(DateTime, default=datetime.utcnow)
+    incident_type = Column(String, index=True)
+    confidence = Column(Float)
+    priority = Column(String)
+    source = Column(String)
+    description = Column(String)
+    screenshot_path = Column(String, nullable=True)
 
 # Create tables
 Base.metadata.create_all(bind=engine)

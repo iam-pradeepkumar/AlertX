@@ -31,7 +31,7 @@ from backend.auth import (
     create_access_token, 
     get_current_user
 )
-from backend.models import get_db, User
+from backend.models import get_db, User, Event, SessionLocal
 from backend.config import (
     BASE_DIR,
     UPLOAD_DIR,
@@ -201,6 +201,23 @@ async def login(form_data: OAuth2PasswordRequestForm = Depends(), db: Session = 
     access_token = create_access_token(data={"sub": user.username})
     return {"access_token": access_token, "token_type": "bearer"}
 
+@app.get("/events")
+async def get_events(limit: int = 50, incident_type: str = None, db: Session = Depends(get_db), current_user: str = Depends(get_current_user)):
+    """Fetch persistent events from the SQLite database."""
+    query = db.query(Event)
+    if incident_type:
+        query = query.filter(Event.incident_type == incident_type)
+    events = query.order_by(Event.timestamp.desc()).limit(limit).all()
+    
+    # Format for frontend (wrap in 'events' key)
+    return {"status": "success", "events": events}
+
+@app.get("/events/db")
+async def get_db_events(limit: int = 50, db: Session = Depends(get_db), current_user: str = Depends(get_current_user)):
+    """Fetch persistent events from the SQLite database."""
+    events = db.query(Event).order_by(Event.timestamp.desc()).limit(limit).all()
+    return events
+
 @app.get("/auth/me")
 async def read_users_me(current_user: str = Depends(get_current_user)):
     return {"username": current_user}
@@ -245,6 +262,27 @@ def _bg_agent_task(frame_result, source, frame_index, recipient):
         # Save context for potential Voice AI dispatch
         if data.get("high_priority_summary"):
             _last_high_priority_event = data["high_priority_summary"]
+            
+        # ── PERSIST TO DATABASE ──────────────────────
+        if frame_result.incidents:
+            db = SessionLocal()
+            try:
+                from backend.models import Event as DBEvent
+                for inc in frame_result.incidents:
+                    new_event = DBEvent(
+                        incident_type=inc.get("type", "unknown"),
+                        confidence=float(inc.get("confidence", 0.0)),
+                        priority=data.get("priority", "MEDIUM"),
+                        source=source,
+                        description=data.get("high_priority_summary", ""),
+                        screenshot_path=frame_result.screenshot_path
+                    )
+                    db.add(new_event)
+                db.commit()
+            except Exception as dbe:
+                logger.error(f"Database Save Error: {dbe}")
+            finally:
+                db.close()
             
     except Exception as e:
         logger.error(f"Background Agent Error: {e}")
