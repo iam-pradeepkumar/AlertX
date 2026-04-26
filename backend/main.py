@@ -307,7 +307,11 @@ def _bg_agent_task(frame_result, source, frame_index, recipient):
                         elif i.get("severity_score", 0) > 0.6:
                             top_priority = "HIGH"
                             
-                    for inc in frame_result.incidents:
+                    # Smart Save: Only save the highest priority incidents
+                    high_priority_incidents = [i for i in frame_result.incidents if i.get("severity_score", 0) > 0.6]
+                    incidents_to_save = high_priority_incidents if high_priority_incidents else frame_result.incidents
+
+                    for inc in incidents_to_save:
                         event_data = {
                             "incident_type": inc.get("type", "unknown"),
                             "confidence": float(inc.get("confidence", 0.0)),
@@ -319,7 +323,7 @@ def _bg_agent_task(frame_result, source, frame_index, recipient):
                         # Save via DBStore helper
                         from backend.models import DBStore
                         DBStore.save_event(event_data)
-                    logger.info(f"Firebase Cloud: Saved {len(frame_result.incidents)} incidents.")
+                    logger.info(f"Firebase Cloud: Saved {len(incidents_to_save)} priority incidents.")
                 except Exception as dbe:
                     logger.error(f"Firebase Save Error: {dbe}")
             except Exception as e_mem:
