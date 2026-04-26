@@ -10,8 +10,7 @@ from typing import Any, Dict
 from agents.base_agent import BaseAgent
 from backend.config import ALERT_COOLDOWN
 from backend.event_store import Event, EventStore
-from utils.email_service import send_email_alert
-from utils.discord_service import send_discord_alert
+from utils.email_api import send_email_api
 from utils.image_host import upload_frame
 # Import for updating global context
 import backend.main as main_module
@@ -19,8 +18,8 @@ import backend.main as main_module
 
 class AlertAgent(BaseAgent):
     """
-    For each incident that passes the cooldown window,
-    creates an Event and pushes it to the EventStore.
+    AlertAgent — Dispatches notifications to Email.
+    Includes smart de-duplication for uploaded files.
     """
 
     def __init__(self):
@@ -83,24 +82,33 @@ class AlertAgent(BaseAgent):
                     # Still upload a link as a secondary fallback
                     media_url = upload_frame(evidence_frame)
                 
-                # Build rich email body
-                subject = f"{inc['priority']} Incident: {inc['type'].upper()}"
-                body = f"AlertX detected a {inc['priority']} priority event.\n\n"
-                body += f"Type: {inc['type'].upper()}\n"
-                body += f"Summary: {inc['summary']}\n"
-                body += f"Time: {inc.get('timestamp', 'N/A')}\n"
-                if media_url:
-                    body += f"\nWeb link: {media_url}\n"
+                # ── DISPATCH ────────────────────────────
+                # Deduplication Logic
+                can_alert = False
+                source_name = data.get("source", "live")
+                incident_type = itype
+                priority = prio
                 
-                # Update global context for AI dispatch
-                main_module._last_high_priority_event = inc["summary"]
-                
-                # Dispatch email with dynamic recipient override
-                recipient = data.get("recipient_override")
-                send_email_alert(subject, body, frame=evidence_frame, recipient=recipient)
-                
-                # ALSO Dispatch to Discord (Reliable on Hugging Face)
-                send_discord_alert(subject, body, frame=evidence_frame)
+                if source_name == "live":
+                    if now - self._last_alert_time.get(incident_type, 0) >= ALERT_COOLDOWN:
+                        can_alert = True
+                        self._last_alert_time[incident_type] = now
+                else:
+                    # For uploaded files: Only alert ONCE per file ever
+                    if source_name not in self._alerted_files:
+                        can_alert = True
+                        self._alerted_files.add(source_name)
+
+                if can_alert:
+                    subject = f"{priority} Incident: {incident_type}"
+                    body = f"AI detected a {incident_type} threat at {datetime.now().strftime('%H:%M:%S')}.\n\nDetails: {data.get('high_priority_summary', inc.get('summary', 'No summary available.'))}\n\nEvidence can be viewed in your AlertX Dashboard."
+                    
+                    # Update global context for AI dispatch
+                    main_module._last_high_priority_event = inc["summary"]
+                    
+                    # Dispatch email with dynamic recipient override
+                    recipient = data.get("recipient_override")
+                    send_email_api(subject, body, frame=evidence_frame, recipient=recipient)
 
         data["alerts_dispatched"] = alerts_dispatched
         self._processed_count += 1
