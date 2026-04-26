@@ -38,26 +38,44 @@ class FrameGrabber:
         actual_source = self.source
         
         # Stream Extraction for YouTube, Twitch, Kick, etc.
-        if isinstance(self.source, str) and self.source.startswith("http"):
+        if isinstance(self.source, str) and ("youtube.com" in self.source or "youtu.be" in self.source):
             try:
                 import yt_dlp
-                logger.info(f"Extracting stream URL from: {self.source}")
+                logger.info(f"Extracting YouTube stream: {self.source}")
                 ydl_opts = {
-                    'format': 'best[height<=480]/best[height<=720]/best',
+                    'format': 'best[ext=mp4]/best', # Prioritize standard mp4/hls for OpenCV
                     'quiet': True,
+                    'no_warnings': True,
                     'noplaylist': True,
-                    'nocheckcertificate': True,
-                    'prefer_insecure': True, # Try HTTP if HTTPS fails
-                    'user_agent': 'Mozilla/5.0 (Linux; Android 10; SM-G960F) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.101 Mobile Safari/537.36',
-                    'extractor_args': {'youtube': {'player_client': ['android', 'web']}}
+                    'extract_flat': False,
+                    'skip_download': True,
+                    # Impersonate mobile browser to bypass bot detection
+                    'user_agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
+                    'extractor_args': {
+                        'youtube': {
+                            'player_client': ['android', 'web'],
+                            'skip': ['hls', 'dash'] # Let yt-dlp pick the best available direct link
+                        }
+                    }
                 }
                 with yt_dlp.YoutubeDL(ydl_opts) as ydl:
                     info = ydl.extract_info(self.source, download=False)
+                    # Try to get the direct stream URL (m3u8 is usually best for live)
                     actual_source = info.get('url')
-                    logger.info("Successfully extracted stream URL.")
+                    if not actual_source and 'formats' in info:
+                        # Fallback: look for m3u8 formats manually
+                        for f in info['formats']:
+                            if f.get('protocol') == 'm3u8_native' or '.m3u8' in f.get('url', ''):
+                                actual_source = f['url']
+                                break
+                    
+                    if actual_source:
+                        logger.info("Successfully extracted YouTube stream URL.")
+                    else:
+                        logger.warning("No direct stream URL found, falling back to raw source.")
+                        actual_source = self.source
             except Exception as e:
-                logger.error(f"Failed to extract stream: {e}")
-                # Fallback: try opening the raw source anyway
+                logger.error(f"YouTube extraction failed: {e}")
                 actual_source = self.source
 
         self._cap = cv2.VideoCapture(actual_source)

@@ -165,9 +165,6 @@ function switchView(viewName) {
     // Close sidebar on mobile after navigating
     closeSidebar();
     
-    const viewTitle = viewName.charAt(0).toUpperCase() + viewName.slice(1).replace('-', ' ');
-    showToast(`Accessing: ${viewTitle} Control Panel`, "info");
-    
     if (viewName === 'live-map') {
         initMap();
     } else if (viewName === 'history') {
@@ -268,7 +265,6 @@ async function findNearbyServices(pos) {
             return;
         }
 
-        showToast(`Intelligence sync: ${data.elements.length} units identified in sector.`, "success");
         // Calculate rough distance helper
         const calcDist = (lat1, lon1, lat2, lon2) => {
             const R = 6371; // km
@@ -563,7 +559,14 @@ async function startFeed() {
             showToast("Live Forensic Stream synchronized via Server Node", "success");
             return;
         } catch (e) {
-            console.warn("AlertX: Server camera unavailable, trying browser webcam...", e.message);
+            console.warn("AlertX: Server camera unavailable.", e.message);
+            // Only fallback to browser webcam if the user is trying to use the default local cam (0)
+            // If they provided a URL/Stream link, we should report the failure instead of switching to their face.
+            if (source !== "0" && source !== "") {
+                showToast(`Vision Link Failed: Source "${source}" unreachable.`, "error");
+                stopFeed();
+                return;
+            }
         }
     }
 
@@ -872,9 +875,8 @@ document.addEventListener('DOMContentLoaded', () => {
     document.querySelectorAll('.dispatch-btn').forEach(btn => {
         btn.onclick = () => {
             const service = btn.dataset.service;
-            showToast(`Initiating AI Voice Agent for ${service.toUpperCase()}...`, "info");
             fetch(`/dispatch/${service}`)
-                .then(() => showToast(`AI Voice Agent successfully contacted ${service.toUpperCase()}`, "success"))
+                .then(() => showToast(`AI Voice Agent contacted ${service.toUpperCase()}`, "success"))
                 .catch(() => showToast("Emergency Protocol Error: AI Agent unreachable", "error"));
         };
     });
