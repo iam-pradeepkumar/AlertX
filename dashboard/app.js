@@ -315,7 +315,8 @@ async function updateStatus() {
         const critical = events.filter(e => e.priority === 'CRITICAL').length;
         const high = events.filter(e => e.priority === 'HIGH').length;
         document.getElementById('stat-critical').textContent = critical;
-        document.getElementById('stat-high').textContent = high;
+        const statHighEl = document.getElementById('stat-high');
+        if (statHighEl) statHighEl.textContent = high;
         
         const statusMsg = document.getElementById('system-status-msg');
         if (statusMsg) {
