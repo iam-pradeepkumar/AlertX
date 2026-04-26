@@ -734,9 +734,10 @@ def analyze_video(filename: str = Query(...), current_user: str = Depends(get_cu
 async def get_events(
     limit: int = Query(default=50, le=200),
     incident_type: Optional[str] = Query(default=None),
+    priority: Optional[str] = Query(default=None),
 ):
     """Get latest detected events."""
-    events = event_store.get_events(limit=limit, incident_type=incident_type)
+    events = event_store.get_events(limit=limit, incident_type=incident_type, priority=priority)
     return {"events": events, "count": len(events)}
 
 

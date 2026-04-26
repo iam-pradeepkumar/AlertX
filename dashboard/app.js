@@ -423,8 +423,14 @@ async function updateStatus() {
 
 async function updateEvents() {
     try {
-        const filter = document.getElementById('filter-type').value;
-        const url = `/events?limit=25${filter ? '&incident_type=' + filter : ''}`;
+        const filterVal = document.getElementById('filter-type').value;
+        let url = `/events?limit=25`;
+        
+        if (filterVal) {
+            const [prefix, value] = filterVal.split(':');
+            if (prefix === 'p') url += `&priority=${value}`;
+            else if (prefix === 't') url += `&incident_type=${value}`;
+        }
         
         const data = await apiRequest(url);
         const events = data.events || [];

@@ -82,11 +82,20 @@ class EventStore:
             )
 
     # ── Read ───────────────────────────────────
-    def get_events(self, limit: int = 50, incident_type: Optional[str] = None) -> List[Dict]:
+    def get_events(
+        self, 
+        limit: int = 50, 
+        incident_type: Optional[str] = None,
+        priority: Optional[str] = None
+    ) -> List[Dict]:
         with self._lock:
             events = list(self._events)
+        
         if incident_type:
             events = [e for e in events if e.incident_type == incident_type]
+        if priority:
+            events = [e for e in events if e.priority == priority]
+            
         return [e.to_dict() for e in events[:limit]]
 
     def get_stats(self) -> Dict:

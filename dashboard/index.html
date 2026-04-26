@@ -133,8 +133,7 @@
                     <div class="status-indicator">
                         <span class="status-dot status-dot--online"></span>
                         <span id="status-text">Server Sync Active</span>
-                        <button class="btn btn--sm btn--ghost" id="btn-refresh-stats" style="margin-left: 1rem;">🔄</button>
-                        <a href="/download/db" target="_blank" class="btn btn--sm btn--primary" style="margin-left: 0.5rem; text-decoration: none; background: #3b82f6 !important;" id="btn-export-db">📥 Export DB</a>
+                        <button class="btn btn--sm btn--ghost" id="btn-refresh-stats" style="margin-left: 1rem;">🔄 Refresh</button>
                     </div>
                 </header>
 
@@ -249,11 +248,19 @@
                     <div class="col-side panel events-section">
                         <div class="panel__header">
                             <h3>Activity Log</h3>
-                            <select id="filter-type" class="select" style="font-size: 0.75rem">
+                            <select id="filter-type" class="select-filter">
                                 <option value="">Global Feed</option>
-                                <option value="CRITICAL">Critical Only</option>
-                                <option value="HIGH">High Only</option>
-                                <option value="fight">Fights Only</option>
+                                <optgroup label="Filter by Priority">
+                                    <option value="p:CRITICAL">Critical Threats</option>
+                                    <option value="p:HIGH">High Priority</option>
+                                    <option value="p:MEDIUM">Standard Events</option>
+                                </optgroup>
+                                <optgroup label="Filter by Incident">
+                                    <option value="t:fire">Fire / Smoke</option>
+                                    <option value="t:weapon">Weapon Detected</option>
+                                    <option value="t:fight">Physical Conflict</option>
+                                    <option value="t:crowd">Large Crowd</option>
+                                </optgroup>
                             </select>
                         </div>
                         <div class="scroll-pane" id="event-log-container">

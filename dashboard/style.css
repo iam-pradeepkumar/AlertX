@@ -639,3 +639,31 @@ body {
     .auth-card { margin: 0 0.5rem; padding: 1.5rem 1rem; }
     .form-group input { padding: 0.75rem 0.9rem; }
 }
+/* Filter Select Styling */
+.select-filter {
+    background: rgba(15, 23, 42, 0.6);
+    border: 1px solid var(--border);
+    border-radius: var(--radius-sm);
+    color: var(--text-primary);
+    padding: 0.4rem 0.8rem;
+    font-size: 0.75rem;
+    font-weight: 600;
+    outline: none;
+    cursor: pointer;
+    transition: 0.3s;
+}
+.select-filter:hover {
+    border-color: var(--accent);
+}
+.select-filter optgroup {
+    background: var(--bg-surface);
+    color: var(--text-secondary);
+    font-style: normal;
+    font-weight: 800;
+    padding: 10px;
+}
+.select-filter option {
+    background: var(--bg-surface);
+    color: var(--text-primary);
+    padding: 5px;
+}
