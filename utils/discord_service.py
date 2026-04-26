@@ -1,14 +1,15 @@
 import requests
+import json
 import logging
 import cv2
 import os
+from datetime import datetime
 
 logger = logging.getLogger("alertx.discord")
 
 def send_discord_alert(subject, body, frame=None):
     """
     Sends a rich alert to Discord via Webhook.
-    Works perfectly on Hugging Face because it uses HTTP (Port 443).
     """
     webhook_url = os.getenv("DISCORD_WEBHOOK_URL")
     if not webhook_url:
@@ -17,11 +18,11 @@ def send_discord_alert(subject, body, frame=None):
     try:
         # Prepare the payload
         payload = {
-            "content": f"🚨 **{subject}**",
             "embeds": [{
-                "title": "AlertX Security Incident",
+                "title": f"🚨 {subject}",
                 "description": body,
-                "color": 15548997 if "CRITICAL" in subject else 15105570
+                "color": 15548997 if "CRITICAL" in subject else 15105570,
+                "timestamp": datetime.utcnow().isoformat()
             }]
         }
 
@@ -29,7 +30,8 @@ def send_discord_alert(subject, body, frame=None):
         if frame is not None:
             _, buffer = cv2.imencode('.jpg', frame)
             files = {'file': ('incident.jpg', buffer.tobytes(), 'image/jpeg')}
-            response = requests.post(webhook_url, data={"payload_json": requests.utils.quote(str(payload))}, files=files)
+            # Discord requires payload_json when sending files
+            response = requests.post(webhook_url, data={"payload_json": json.dumps(payload)}, files=files)
         else:
             response = requests.post(webhook_url, json=payload)
 
