@@ -545,8 +545,13 @@ async function startFeed() {
             placeholder.classList.add('hidden');
             isLive = true;
             isBrowserCamMode = false;
-            feed.onload = () => { btn.textContent = "Node Online"; };
-            showToast("Server camera connected", "success");
+            feed.onload = () => { 
+                btn.textContent = "Node Online"; 
+                const badge = document.getElementById('node-status-badge');
+                badge.textContent = "Online";
+                badge.className = "badge badge--online";
+            };
+            showToast("Live Forensic Stream synchronized via Server Node", "success");
             return;
         } catch (e) {
             console.warn("AlertX: Server camera unavailable, trying browser webcam...", e.message);
@@ -704,7 +709,10 @@ async function startFeed() {
         // Start the loop after a brief delay for camera warm-up
         setTimeout(scheduleCaptureLoop, 1000);
 
-        showToast("Browser webcam active — AI processing enabled", "success");
+        showToast("Intelligence Node Active — AI Vision Processing enabled", "success");
+        const badge = document.getElementById('node-status-badge');
+        badge.textContent = "Online (Cam)";
+        badge.className = "badge badge--online";
 
     } catch (camErr) {
         console.error("AlertX: Browser camera initialization failed:", camErr);
@@ -749,6 +757,11 @@ async function stopFeed() {
         btn.textContent = "Start Node";
         btn.disabled = false;
         isLive = false;
+
+        const badge = document.getElementById('node-status-badge');
+        badge.textContent = "Standby";
+        badge.className = "badge badge--offline";
+        showToast("Node Offline — Intelligence protocols suspended", "info");
     } catch (e) {
         showToast("Stop failed", "error");
     }
@@ -819,6 +832,14 @@ document.addEventListener('DOMContentLoaded', () => {
     document.getElementById('btn-start').onclick = startFeed;
     document.getElementById('btn-stop').onclick = stopFeed;
 
+    document.getElementById('btn-apply-source').onclick = () => {
+        const source = document.getElementById('cam-source').value;
+        showToast(`Vision source configured: ${source}`, "success");
+        if (isLive) {
+            showToast("Restart Node to apply new vision source", "info");
+        }
+    };
+
     // Upload interaction
     const zone = document.getElementById('upload-zone');
     const input = document.getElementById('file-input');
@@ -838,9 +859,10 @@ document.addEventListener('DOMContentLoaded', () => {
     document.querySelectorAll('.dispatch-btn').forEach(btn => {
         btn.onclick = () => {
             const service = btn.dataset.service;
+            showToast(`Initiating AI Voice Agent for ${service.toUpperCase()}...`, "info");
             fetch(`/dispatch/${service}`)
-                .then(() => showToast(`AI Dispatch triggered for ${service.toUpperCase()}`, "success"))
-                .catch(() => showToast("Failed to trigger AI Agent", "error"));
+                .then(() => showToast(`AI Voice Agent successfully contacted ${service.toUpperCase()}`, "success"))
+                .catch(() => showToast("Emergency Protocol Error: AI Agent unreachable", "error"));
         };
     });
 
