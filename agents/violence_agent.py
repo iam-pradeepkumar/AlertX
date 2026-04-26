@@ -70,26 +70,54 @@ class ViolenceAgent:
 
         # 1. High Priority (Violence/Accident/Fire)
         if scores["a photo of street violence or fighting"] > 0.65:
-            active_incidents.append({"type": "fight", "confidence": scores["a photo of street violence or fighting"]})
+            active_incidents.append({
+                "type": "fight", 
+                "confidence": scores["a photo of street violence or fighting"],
+                "severity_score": 0.95 # CRITICAL
+            })
         
         if scores["a photo of a fire or smoke"] > 0.75:
-            active_incidents.append({"type": "fire", "confidence": scores["a photo of a fire or smoke"]})
+            active_incidents.append({
+                "type": "fire", 
+                "confidence": scores["a photo of a fire or smoke"],
+                "severity_score": 0.99 # CRITICAL
+            })
 
         if scores["a photo of a car accident or crash"] > 0.70:
-            active_incidents.append({"type": "accident", "confidence": scores["a photo of a car accident or crash"]})
+            active_incidents.append({
+                "type": "accident", 
+                "confidence": scores["a photo of a car accident or crash"],
+                "severity_score": 0.90 # CRITICAL
+            })
 
         # 2. Medium Priority (Suspicious/Medical)
         if scores["a photo of a person falling down or a medical emergency"] > 0.60:
-            active_incidents.append({"type": "medical", "confidence": scores["a photo of a person falling down or a medical emergency"]})
+            active_incidents.append({
+                "type": "medical", 
+                "confidence": scores["a photo of a person falling down or a medical emergency"],
+                "severity_score": 0.75 # HIGH
+            })
 
         if scores["a photo of a person breaking a window or glass"] > 0.55:
-            active_incidents.append({"type": "vandalism", "confidence": scores["a photo of a person breaking a window or glass"]})
+            active_incidents.append({
+                "type": "vandalism", 
+                "confidence": scores["a photo of a person breaking a window or glass"],
+                "severity_score": 0.85 # HIGH
+            })
 
         if scores["a photo of a person climbing a fence or wall"] > 0.65:
-            active_incidents.append({"type": "suspicious", "confidence": scores["a photo of a person climbing a fence or wall"]})
+            active_incidents.append({
+                "type": "suspicious", 
+                "confidence": scores["a photo of a person climbing a fence or wall"],
+                "severity_score": 0.60 # MEDIUM
+            })
 
         if scores["a photo of a person hiding their face or wearing a mask"] > 0.70:
-            active_incidents.append({"type": "suspicious", "confidence": scores["a photo of a person hiding their face or wearing a mask"]})
+            active_incidents.append({
+                "type": "suspicious", 
+                "confidence": scores["a photo of a person hiding their face or wearing a mask"],
+                "severity_score": 0.70 # MEDIUM
+            })
 
         # Inject detected activities into the frame result
         for inc in active_incidents:

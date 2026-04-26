@@ -214,13 +214,30 @@ async def download_db(current_user: str = Depends(get_current_user)):
 @app.get("/events")
 async def get_events(limit: int = 50, incident_type: str = None, db: Session = Depends(get_db), current_user: str = Depends(get_current_user)):
     """Fetch persistent events from the SQLite database."""
-    query = db.query(Event)
-    if incident_type:
-        query = query.filter(Event.incident_type == incident_type)
-    events = query.order_by(Event.timestamp.desc()).limit(limit).all()
-    
-    # Format for frontend (wrap in 'events' key)
-    return {"status": "success", "events": events}
+    try:
+        query = db.query(Event)
+        if incident_type:
+            query = query.filter(Event.incident_type == incident_type)
+        events = query.order_by(Event.timestamp.desc()).limit(limit).all()
+        
+        # Format for frontend (Legacy support)
+        # The dashboard expects a list of dictionaries with specific keys
+        formatted_events = []
+        for e in events:
+            formatted_events.append({
+                "id": e.id,
+                "timestamp": e.timestamp.isoformat(),
+                "incident_type": e.incident_type,
+                "confidence": e.confidence,
+                "priority": e.priority or "MEDIUM",
+                "description": e.description,
+                "source": e.source
+            })
+        
+        return {"status": "success", "events": formatted_events}
+    except Exception as err:
+        logger.error(f"Event Fetch Error: {err}")
+        return {"status": "error", "events": []}
 
 @app.get("/events/db")
 async def get_db_events(limit: int = 50, db: Session = Depends(get_db), current_user: str = Depends(get_current_user)):
@@ -289,10 +306,18 @@ def _bg_agent_task(frame_result, source, frame_index, recipient):
                     )
                     db.add(new_event)
                 db.commit()
+                logger.info(f"Database: Saved {len(frame_result.incidents)} incidents.")
             except Exception as dbe:
                 logger.error(f"Database Save Error: {dbe}")
             finally:
                 db.close()
+            
+        # ── TRIGGER ALERTS ──────────────────────────
+        # Ensure alert_agent runs even if DB fails
+        try:
+            data = alert_agent.process(data)
+        except Exception as ae:
+            logger.error(f"Alert Agent Error: {ae}")
             
     except Exception as e:
         logger.error(f"Background Agent Error: {e}")
