@@ -595,6 +595,14 @@ async def process_frame(file: UploadFile = File(...), current_user: str = Depend
 
     if not detector._loaded:
         detector.load()
+    
+    # PERF: Downscale large frames to 320px wide before detection
+    # Guarantees fast processing regardless of what the client sends
+    h, w = frame.shape[:2]
+    max_w = 320
+    if w > max_w:
+        scale = max_w / w
+        frame = cv2.resize(frame, (max_w, int(h * scale)), interpolation=cv2.INTER_NEAREST)
         
     # INCREASE QUALITY: Detect at 640px for better accuracy
     # (Since we aren't encoding/sending a frame back, we can afford more AI power)

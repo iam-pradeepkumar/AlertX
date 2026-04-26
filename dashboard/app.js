@@ -133,12 +133,33 @@ function showApp() {
 
 // ── UI NAVIGATION ────────────────────────────────
 
+function toggleSidebar() {
+    const sidebar = document.querySelector('.sidebar');
+    const backdrop = document.getElementById('sidebar-backdrop');
+    const isOpen = sidebar.classList.contains('open');
+    if (isOpen) {
+        sidebar.classList.remove('open');
+        backdrop.classList.remove('active');
+    } else {
+        sidebar.classList.add('open');
+        backdrop.classList.add('active');
+    }
+}
+
+function closeSidebar() {
+    document.querySelector('.sidebar').classList.remove('open');
+    document.getElementById('sidebar-backdrop').classList.remove('active');
+}
+
 function switchView(viewName) {
     document.querySelectorAll('.view').forEach(v => v.classList.remove('active'));
     document.querySelectorAll('.nav-item').forEach(n => n.classList.remove('active'));
     
     document.getElementById(`view-${viewName}`).classList.add('active');
     document.querySelector(`[data-view="${viewName}"]`).classList.add('active');
+    
+    // Close sidebar on mobile after navigating
+    closeSidebar();
     
     if (viewName === 'live-map') {
         initMap();
@@ -541,8 +562,9 @@ async function startFeed() {
         console.log("AlertX: Server camera failed, initiating browser-side fallback...");
         showToast("Server has no camera. Switching to browser webcam...", "info");
 
+        // PERF: Request lower resolution from phone camera to save memory/CPU
         browserStream = await navigator.mediaDevices.getUserMedia({
-            video: { width: { ideal: 640 }, height: { ideal: 480 }, facingMode: "environment" },
+            video: { width: { ideal: 480 }, height: { ideal: 360 }, facingMode: "environment" },
             audio: false
         });
 
@@ -559,17 +581,21 @@ async function startFeed() {
         feed.classList.add('hidden');
         placeholder.classList.add('hidden');
 
+        // PERF: Use smaller canvas for AI detection (320x240 is plenty for YOLO)
+        const DETECT_W = 320;
+        const DETECT_H = 240;
+
         // Robust wait for video metadata
         if (browserCam.readyState >= 2) {
-            canvas.width = 640; // Detection resolution
-            canvas.height = 480;
+            canvas.width = DETECT_W;
+            canvas.height = DETECT_H;
             overlay.width = browserCam.videoWidth;
             overlay.height = browserCam.videoHeight;
         } else {
             await new Promise((resolve) => {
                 browserCam.onloadedmetadata = () => {
-                    canvas.width = 640;
-                    canvas.height = 480;
+                    canvas.width = DETECT_W;
+                    canvas.height = DETECT_H;
                     overlay.width = browserCam.videoWidth;
                     overlay.height = browserCam.videoHeight;
                     resolve();
@@ -583,27 +609,40 @@ async function startFeed() {
         btn.textContent = "Browser Cam Live";
         btn.disabled = false;
 
-        let isProcessing = false;
-        
-        setTimeout(() => {
-            browserCamInterval = setInterval(async () => {
-            if (!isLive || !isBrowserCamMode || isProcessing) return;
+        // ── ADAPTIVE FRAME LOOP (replaces setInterval to prevent request overlap) ──
+        // Uses setTimeout chaining: next frame only captured AFTER previous response returns.
+        // This guarantees zero request pile-up on slow mobile networks.
+        let adaptiveInterval = 500; // Start at 500ms (2 FPS)
+        const MIN_INTERVAL = 300;   // Fastest: ~3 FPS
+        const MAX_INTERVAL = 1500;  // Slowest: ~0.7 FPS (very slow network)
 
-            isProcessing = true;
+        async function captureAndProcess() {
+            if (!isLive || !isBrowserCamMode) return;
+
+            const t0 = performance.now();
             try {
-                // Capture frame for AI (scaled down to 640px for speed)
+                // Capture frame at small detection resolution
                 ctx.drawImage(browserCam, 0, 0, canvas.width, canvas.height);
-                const blob = await new Promise(resolve => canvas.toBlob(resolve, 'image/jpeg', 0.6));
-                if (!blob) { isProcessing = false; return; }
+                // PERF: Use 0.3 quality JPEG — much smaller payload over mobile networks
+                const blob = await new Promise(resolve => canvas.toBlob(resolve, 'image/jpeg', 0.3));
+                if (!blob) {
+                    scheduleCaptureLoop();
+                    return;
+                }
 
                 const formData = new FormData();
                 formData.append('file', blob, 'frame.jpg');
 
+                const controller = new AbortController();
+                const timeoutId = setTimeout(() => controller.abort(), 5000); // 5s hard timeout
+
                 const response = await fetch(`${API_BASE}/process_frame`, {
                     method: 'POST',
                     headers: { 'Authorization': `Bearer ${token}` },
-                    body: formData
+                    body: formData,
+                    signal: controller.signal
                 });
+                clearTimeout(timeoutId);
 
                 if (!response.ok) throw new Error('AI Sync Failed');
                 const data = await response.json();
@@ -611,22 +650,22 @@ async function startFeed() {
                 // ── DRAW BOXES (Client Side) ──
                 overlayCtx.clearRect(0, 0, overlay.width, overlay.height);
                 
-                // Scale factor between detection size (640x480) and display size
+                // Scale factor between detection size and display size
                 const scaleX = overlay.width / canvas.width;
                 const scaleY = overlay.height / canvas.height;
 
                 if (data.detections) {
                     data.detections.forEach(det => {
                         const [x1, y1, x2, y2] = det.box;
-                        const color = det.type ? "#ff4d4d" : "#00ff88"; // Red for incidents, Green for info
+                        const color = det.type ? "#ff4d4d" : "#00ff88";
                         
                         overlayCtx.strokeStyle = color;
                         overlayCtx.lineWidth = 3;
                         overlayCtx.strokeRect(x1 * scaleX, y1 * scaleY, (x2-x1) * scaleX, (y2-y1) * scaleY);
 
                         overlayCtx.fillStyle = color;
-                        overlayCtx.font = "bold 16px Inter, sans-serif";
-                        overlayCtx.fillText(`${det.label} ${Math.round(det.conf*100)}%`, x1 * scaleX, y1 * scaleY - 10);
+                        overlayCtx.font = "bold 14px Outfit, sans-serif";
+                        overlayCtx.fillText(`${det.label} ${Math.round(det.conf*100)}%`, x1 * scaleX, (y1 * scaleY) - 8);
                     });
                 }
 
@@ -634,15 +673,38 @@ async function startFeed() {
                     data.incidents.forEach(inc => showToast(`🚨 ${inc.type.toUpperCase()}!`, "error"));
                     updateEvents();
                 }
-            } catch (err) {
-                console.warn("AI Loop Error:", err);
-            } finally {
-                isProcessing = false;
-            }
-        }, 300); // 3 FPS detection (Video remains 30FPS)
-    }, 1000);
 
-    showToast("Browser webcam active — AI processing enabled", "success");
+                // ── ADAPTIVE SPEED: Adjust interval based on round-trip time ──
+                const elapsed = performance.now() - t0;
+                if (elapsed > 800) {
+                    // Slow network — back off
+                    adaptiveInterval = Math.min(adaptiveInterval + 200, MAX_INTERVAL);
+                } else if (elapsed < 300) {
+                    // Fast network — speed up
+                    adaptiveInterval = Math.max(adaptiveInterval - 50, MIN_INTERVAL);
+                }
+
+            } catch (err) {
+                if (err.name === 'AbortError') {
+                    console.warn("AlertX: Frame request timed out, slowing down...");
+                    adaptiveInterval = Math.min(adaptiveInterval + 300, MAX_INTERVAL);
+                } else {
+                    console.warn("AI Loop Error:", err);
+                }
+            }
+
+            scheduleCaptureLoop();
+        }
+
+        function scheduleCaptureLoop() {
+            if (!isLive || !isBrowserCamMode) return;
+            browserCamInterval = setTimeout(captureAndProcess, adaptiveInterval);
+        }
+
+        // Start the loop after a brief delay for camera warm-up
+        setTimeout(scheduleCaptureLoop, 1000);
+
+        showToast("Browser webcam active — AI processing enabled", "success");
 
     } catch (camErr) {
         console.error("AlertX: Browser camera initialization failed:", camErr);
@@ -662,7 +724,7 @@ async function stopFeed() {
         // Stop browser webcam if active
         if (isBrowserCamMode) {
             if (browserCamInterval) {
-                clearInterval(browserCamInterval);
+                clearTimeout(browserCamInterval);  // Changed from clearInterval to clearTimeout
                 browserCamInterval = null;
             }
             if (browserStream) {
@@ -747,6 +809,12 @@ document.addEventListener('DOMContentLoaded', () => {
             switchView(btn.dataset.view);
         };
     });
+
+    // Hamburger menu (mobile)
+    const hamburgerBtn = document.getElementById('hamburger-btn');
+    const sidebarBackdrop = document.getElementById('sidebar-backdrop');
+    if (hamburgerBtn) hamburgerBtn.onclick = toggleSidebar;
+    if (sidebarBackdrop) sidebarBackdrop.onclick = closeSidebar;
 
     document.getElementById('btn-start').onclick = startFeed;
     document.getElementById('btn-stop').onclick = stopFeed;

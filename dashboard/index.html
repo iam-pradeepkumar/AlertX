@@ -115,8 +115,13 @@
             </div>
         </aside>
 
+        <!-- Sidebar Backdrop (mobile) -->
+        <div id="sidebar-backdrop" class="sidebar-backdrop"></div>
+
         <!-- Primary View Area -->
         <main class="main-stage">
+            <!-- Hamburger Menu (mobile) -->
+            <button id="hamburger-btn" class="hamburger-btn" aria-label="Open menu">☰</button>
             
             <!-- Dashboard View -->
             <div id="view-dashboard" class="view active">
@@ -252,7 +257,7 @@
                 <header class="view-header">
                     <h1>Operational Intelligence Map</h1>
                 </header>
-                <div style="display: grid; grid-template-columns: 3fr 1fr; gap: 1.5rem; height: 70vh">
+                <div class="map-grid" style="display: grid; grid-template-columns: 3fr 1fr; gap: 1.5rem; height: 70vh">
                     <div class="panel">
                         <div id="map" style="height: 100%; width: 100%"></div>
                     </div>

@@ -322,11 +322,191 @@ body {
 @keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } }
 @keyframes slideIn { from { transform: translateX(20px); opacity: 0; } to { transform: translateX(0); opacity: 1; } }
 
-/* Responsive Adjustments */
+/* ── HAMBURGER MENU BUTTON ────────────────── */
+.hamburger-btn {
+    display: none;
+    background: var(--bg-panel);
+    border: 1px solid var(--border);
+    color: var(--text-primary);
+    width: 44px;
+    height: 44px;
+    border-radius: var(--radius-md);
+    cursor: pointer;
+    align-items: center;
+    justify-content: center;
+    font-size: 1.4rem;
+    z-index: 60;
+    transition: 0.3s;
+    flex-shrink: 0;
+}
+.hamburger-btn:hover { background: var(--secondary); }
+
+/* Sidebar overlay backdrop (mobile) */
+.sidebar-backdrop {
+    display: none;
+    position: fixed;
+    inset: 0;
+    background: rgba(0, 0, 0, 0.6);
+    backdrop-filter: blur(4px);
+    z-index: 49;
+    opacity: 0;
+    transition: opacity 0.3s ease;
+}
+.sidebar-backdrop.active {
+    display: block;
+    opacity: 1;
+}
+
+/* text--online utility */
+.text--online { color: var(--online); font-weight: 600; }
+
+/* ── RESPONSIVE: Small Desktop (≤1400px) ───── */
 @media (max-width: 1400px) {
     .dashboard-grid { grid-template-columns: 1fr; }
     .app-shell { grid-template-columns: 80px 1fr; }
-    .logo__text, .nav-item span { display: none; }
+    .logo__text, .nav-item span, .sidebar-footer .user-info { display: none; }
     .nav-item { justify-content: center; padding: 1.25rem; }
     .sidebar { width: 80px; align-items: center; }
+    .sidebar .logo { justify-content: center; }
+}
+
+/* ── RESPONSIVE: Tablet (≤1024px) ──────────── */
+@media (max-width: 1024px) {
+    .main-stage { padding: 1.5rem; }
+    .view-header { flex-direction: column; align-items: flex-start; gap: 1rem; }
+    .view-header h1 { font-size: 1.6rem; }
+    .stats-grid { grid-template-columns: repeat(3, 1fr); gap: 1rem; margin-bottom: 1.5rem; }
+    .stat-card { padding: 1.25rem 1rem; gap: 1rem; }
+    .stat-card__icon { width: 48px; height: 48px; font-size: 1.6rem; border-radius: 12px; }
+    .stat-card__content h3 { font-size: 1.4rem; }
+
+    /* Geo map view stacked */
+    #view-live-map .panel { min-height: 0; }
+
+    .events-section { min-height: 400px; }
+}
+
+/* ── RESPONSIVE: Mobile (≤768px) ───────────── */
+@media (max-width: 768px) {
+    body { overflow: auto; height: auto; min-height: 100vh; }
+
+    .hamburger-btn { display: flex; }
+
+    .app-shell {
+        grid-template-columns: 1fr;
+        height: auto;
+        min-height: 100vh;
+    }
+
+    /* Sidebar becomes off-canvas overlay */
+    .sidebar {
+        position: fixed;
+        top: 0;
+        left: 0;
+        width: 280px;
+        height: 100vh;
+        transform: translateX(-100%);
+        transition: transform 0.35s cubic-bezier(0.4, 0, 0.2, 1);
+        z-index: 100;
+        align-items: stretch;
+    }
+    .sidebar.open {
+        transform: translateX(0);
+    }
+    /* Restore full labels when sidebar is open on mobile */
+    .sidebar.open .logo__text,
+    .sidebar.open .nav-item span,
+    .sidebar.open .sidebar-footer .user-info {
+        display: block;
+    }
+    .sidebar.open .nav-item { justify-content: flex-start; }
+    .sidebar.open .logo { justify-content: flex-start; }
+
+    .main-stage { padding: 1rem; overflow-y: auto; }
+
+    .view-header {
+        flex-direction: column;
+        align-items: flex-start;
+        gap: 0.75rem;
+        margin-bottom: 1.5rem;
+    }
+    .view-header h1 { font-size: 1.4rem; }
+
+    .status-indicator {
+        width: 100%;
+        justify-content: center;
+        flex-wrap: wrap;
+        gap: 0.5rem;
+        padding: 0.5rem 0.8rem;
+        font-size: 0.8rem;
+    }
+
+    .stats-grid { grid-template-columns: repeat(2, 1fr); gap: 0.75rem; margin-bottom: 1.5rem; }
+    .stat-card { padding: 1rem 0.75rem; gap: 0.75rem; }
+    .stat-card__icon { width: 40px; height: 40px; font-size: 1.3rem; border-radius: 10px; }
+    .stat-card__content h3 { font-size: 1.2rem; }
+    .stat-card__content p { font-size: 0.75rem; }
+    .stat-card:hover { transform: none; }
+
+    .dashboard-grid { grid-template-columns: 1fr; gap: 1rem; }
+
+    .panel__header { padding: 1rem 1.25rem; }
+    .panel__header h3 { font-size: 0.95rem; }
+
+    .feed-wrapper { aspect-ratio: 16/9; }
+
+    .dispatch-grid { padding: 1rem; gap: 0.75rem; }
+    .dispatch-btn .icon { font-size: 1.6rem; }
+    .dispatch-btn:hover { transform: none; }
+
+    .upload-area { padding: 1rem; }
+    .upload-box { padding: 2rem 1rem; }
+    .upload-box .icon { font-size: 2.5rem; }
+
+    .events-section { min-height: 350px; }
+    .scroll-pane { padding: 1rem; }
+
+    .event-item { padding: 1rem; gap: 0.75rem; flex-direction: column; }
+    .event-item__time { font-size: 0.75rem; }
+    .event-item__title { font-size: 0.95rem; }
+    .event-item:hover { transform: none; }
+
+    /* Map view: stacked on mobile */
+    .map-grid {
+        display: flex !important;
+        flex-direction: column !important;
+        height: auto !important;
+    }
+    .map-grid .panel:first-child { min-height: 50vh; }
+
+    /* Auth card: full width on mobile */
+    .auth-card { padding: 2rem 1.5rem; max-width: 100%; margin: 0 1rem; }
+
+    /* Toast: full width on mobile */
+    .toast { padding: 1rem 1.5rem; font-size: 0.85rem; }
+
+    /* Btn touch targets */
+    .btn { padding: 0.7rem 1.4rem; min-height: 44px; }
+    .btn--sm { padding: 0.5rem 0.8rem; min-height: 36px; font-size: 0.75rem; }
+}
+
+/* ── RESPONSIVE: Small Phone (≤480px) ──────── */
+@media (max-width: 480px) {
+    .main-stage { padding: 0.75rem; }
+    .view-header h1 { font-size: 1.2rem; }
+
+    .stats-grid { grid-template-columns: 1fr; gap: 0.5rem; }
+    .stat-card { flex-direction: row; padding: 0.8rem; }
+
+    .dispatch-grid { grid-template-columns: repeat(3, 1fr); gap: 0.5rem; padding: 0.75rem; }
+    .dispatch-btn { aspect-ratio: auto; padding: 0.75rem 0.5rem; }
+    .dispatch-btn .icon { font-size: 1.3rem; }
+    .dispatch-btn__label { font-size: 0.65rem; }
+
+    .feed-wrapper { aspect-ratio: 4/3; }
+
+    .event-item { padding: 0.75rem; }
+
+    .auth-card { margin: 0 0.5rem; padding: 1.5rem 1rem; }
+    .form-group input { padding: 0.75rem 0.9rem; }
 }
