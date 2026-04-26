@@ -307,10 +307,10 @@ async function updateStatus() {
             emailInput.value = data.alert_recipient || "";
         }
         
-        document.getElementById('stat-total').textContent = data.events ? data.events.total_events : 0;
-        
         const eventData = await apiRequest('/events?limit=100');
         const events = eventData.events || [];
+        
+        document.getElementById('stat-total').textContent = events.length;
         
         const critical = events.filter(e => e.priority === 'CRITICAL').length;
         const high = events.filter(e => e.priority === 'HIGH').length;

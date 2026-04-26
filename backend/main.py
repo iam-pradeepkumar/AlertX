@@ -526,19 +526,26 @@ async def stop_camera(current_user: str = Depends(get_current_user)):
 
 
 @app.get("/status")
-async def get_status(current_user: str = Depends(get_current_user)):
+async def system_status(current_user: str = Depends(get_current_user)):
     """System health and node status."""
-    from backend.models import SQLALCHEMY_DATABASE_URL
-    is_cloud = "supabase" in SQLALCHEMY_DATABASE_URL.lower() or "postgres" in SQLALCHEMY_DATABASE_URL.lower()
+    is_active = (frame_grabber is not None and frame_grabber.is_running) or \
+                (time.time() - _last_activity_time < 10.0)
+                
     return {
-        "camera_active": frame_grabber.is_running if frame_grabber else False,
+        "status": "online",
+        "camera_active": is_active,
         "processing_active": _processing_live,
         "is_incident_active": _is_processing_incident,
+        "model_loaded": detector.is_loaded,
         "alert_recipient": _alert_recipient,
-        "db_mode": "Cloud (Supabase)" if is_cloud else "Local (SQLite)",
+        "db_mode": "Cloud (Firebase)",
         "last_sync": datetime.now().isoformat(),
-        "events": {
-            "total_events": event_store.get_stats()["total_events"]
+        "agents": {
+            "detection": detection_agent.stats,
+            "threat_analysis": threat_agent.stats,
+            "decision": decision_agent.stats,
+            "alert": alert_agent.stats,
+            "learning": learning_agent.stats,
         }
     }
 
@@ -719,28 +726,6 @@ async def acknowledge_event(event_id: str):
 
 
 # ── System Status ──────────────────────────────
-@app.get("/status")
-async def system_status():
-    """Overall system health and component status."""
-    # Active if server grabber is running OR browser is pushing frames (last 10s)
-    is_active = (frame_grabber is not None and frame_grabber.is_running) or \
-                (time.time() - _last_activity_time < 10.0)
-                
-    return {
-        "status": "online",
-        "camera_active": is_active,
-        "model_loaded": detector.is_loaded,
-        "agents": {
-            "detection": detection_agent.stats,
-            "threat_analysis": threat_agent.stats,
-            "decision": decision_agent.stats,
-            "alert": alert_agent.stats,
-            "learning": learning_agent.stats,
-        },
-        "events": event_store.get_stats(),
-        "alert_recipient": _alert_recipient
-    }
-
 
 
 
