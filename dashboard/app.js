@@ -319,8 +319,8 @@ async function updateStatus() {
         
         const statusMsg = document.getElementById('system-status-msg');
         if (statusMsg) {
-            const dbBadge = data.db_mode === "Cloud (Supabase)" ? 
-                '<span style="color: #10b981; font-weight: bold;">[☁️ Cloud Active]</span>' : 
+            const dbBadge = data.db_mode === "Cloud (Firebase)" ? 
+                '<span style="color: #10b981; font-weight: bold;">[☁️ Firebase Active]</span>' : 
                 '<span style="color: #f59e0b; font-weight: bold;">[💾 Local Mode]</span>';
             statusMsg.innerHTML = (data.camera_active ? "AI Node Online " : "AI Node Standby ") + dbBadge;
         }
@@ -368,7 +368,7 @@ async function updateEvents() {
                 <div class="event-item__time">${new Date(e.timestamp).toLocaleTimeString([], {hour: '2-digit', minute:'2-digit', second:'2-digit'})}</div>
                 <div class="event-item__content">
                     <span class="event-item__tag tag--${e.priority.toLowerCase()}">${e.priority} ${e.incident_type.toUpperCase()}</span>
-                    <div class="event-item__title">${e.details}</div>
+                    <div class="event-item__title">${e.description || e.details || 'Incident detected'}</div>
                 </div>
             </li>
             `;
@@ -397,7 +397,7 @@ async function updateHistory() {
                 <div class="event-item__time">${new Date(e.timestamp).toLocaleString()}</div>
                 <div class="event-item__content">
                     <span class="event-item__tag tag--${e.priority.toLowerCase()}">${e.priority} ${e.incident_type.toUpperCase()}</span>
-                    <div class="event-item__title">${e.details}</div>
+                    <div class="event-item__title">${e.description || e.details || 'Incident detected'}</div>
                     <div style="font-size:0.75rem; color:var(--text-secondary); margin-top:0.5rem">Source: ${e.source} | Frame ID: ${e.frame_index}</div>
                 </div>
             </li>

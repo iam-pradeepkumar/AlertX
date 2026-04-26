@@ -312,13 +312,18 @@ def _bg_agent_task(frame_result, source, frame_index, recipient):
                     incidents_to_save = high_priority_incidents if high_priority_incidents else frame_result.incidents
 
                     for inc in incidents_to_save:
+                        # Ensure we get the best possible priority
+                        final_priority = inc.get("priority", top_priority)
+                        if "fight" in inc.get("type", "").lower() or "violence" in inc.get("type", "").lower():
+                            final_priority = "CRITICAL"
+
                         event_data = {
-                            "incident_type": inc.get("type", "unknown"),
+                            "incident_type": inc.get("type", "unknown").upper(),
                             "confidence": float(inc.get("confidence", 0.0)),
-                            "priority": inc.get("priority", top_priority),
+                            "priority": final_priority,
                             "source": source,
-                            "description": data.get("high_priority_summary", ""),
-                            "screenshot_path": frame_result.screenshot_path
+                            "description": data.get("high_priority_summary") or f"Detected {inc.get('type')} in the area.",
+                            "timestamp_iso": datetime.utcnow().isoformat()
                         }
                         # Save via DBStore helper
                         from backend.models import DBStore
