@@ -26,6 +26,7 @@ class AlertAgent(BaseAgent):
         super().__init__("alert")
         self._store = EventStore()
         self._last_alert_time: Dict[str, float] = {}  # incident_type → timestamp
+        self._alerted_files = set() # Track already alerted files
 
     def _should_alert(self, incident_type: str) -> bool:
         now = time.time()
