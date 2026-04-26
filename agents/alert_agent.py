@@ -87,13 +87,28 @@ class AlertAgent(BaseAgent):
                 
                 # ── DISPATCH ────────────────────────────
                 # Deduplication Logic
-                can_alert = False
+                # ── ALIGNMENT & DEDUPLICATION ────────────────
                 source_name = data.get("source", "live")
-                incident_type = itype
-                priority = prio
-                description = data.get("high_priority_summary", inc.get("summary", ""))
+                incident_type = itype.upper()
+                priority = prio.upper()
+                
+                can_alert = False
+                if source_name == "live":
+                    elapsed = time.time() - self._last_alert_time.get(incident_type, 0)
+                    if elapsed >= ALERT_COOLDOWN:
+                        can_alert = True
+                    else:
+                        logger.info(f"⏳ Cooldown: {incident_type} alert squelched ({int(ALERT_COOLDOWN - elapsed)}s left)")
+                else:
+                    if source_name not in self._alerted_files:
+                        can_alert = True
+                    else:
+                        logger.info(f"⏭️ Deduplication: File '{source_name}' already notified.")
 
-                # Encode image for attachment
+                if not can_alert:
+                    continue
+
+                # ── PREPARE MEDIA ──────────────────────────
                 image_bytes = None
                 if frame_result.annotated_frame is not None:
                     try:
@@ -102,44 +117,33 @@ class AlertAgent(BaseAgent):
                     except Exception as ie:
                         logger.error(f"Image Encoding Error: {ie}")
 
-                # Construct the message
+                # ── DISPATCH ──────────────────────────────
                 alert_msg = f"--- ALERTX SECURITY ALERT ---\n\n"
-                alert_msg += f"Incident: {incident_type.upper()}\n"
+                alert_msg += f"Incident: {incident_type}\n"
                 alert_msg += f"Priority: {priority}\n"
                 alert_msg += f"Time: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}\n"
                 alert_msg += f"Source: {source_name}\n"
-                if description:
-                    alert_msg += f"Summary: {description}\n"
+                summary = data.get("high_priority_summary") or inc.get("summary", "No details")
+                alert_msg += f"Summary: {summary}\n"
                 alert_msg += "\n-----------------------------\n"
                 alert_msg += "View live at: " + main_module.PUBLIC_URL + "\n"
 
-                # NOW Send via standard SMTP
+                logger.info(f"📧 Sending Email Alert for {incident_type}...")
                 success = send_email(
-                    subject=f"{incident_type.upper()} Detected!",
+                    subject=f"🚨 {priority} ALERT: {incident_type}",
                     message=alert_msg,
                     image_data=image_bytes
                 )
-                
-                if source_name == "live":
-                    if time.time() - self._last_alert_time.get(incident_type, 0) >= ALERT_COOLDOWN:
-                        can_alert = True
-                        self._last_alert_time[incident_type] = time.time()
-                else:
-                    # For uploaded files: Only alert ONCE per file ever
-                    if source_name not in self._alerted_files:
-                        can_alert = True
-                        self._alerted_files.add(source_name)
 
-                if can_alert:
-                    subject = f"{priority} Incident: {incident_type}"
-                    body = f"AI detected a {incident_type} threat at {datetime.now().strftime('%H:%M:%S')}.\n\nDetails: {data.get('high_priority_summary', inc.get('summary', 'No summary available.'))}\n\nEvidence can be viewed in your AlertX Dashboard."
+                if success:
+                    alerts_dispatched += 1
+                    if source_name == "live":
+                        self._last_alert_time[incident_type] = time.time()
+                    else:
+                        self._alerted_files.add(source_name)
                     
-                    # Update global context for AI dispatch
-                    main_module._last_high_priority_event = inc["summary"]
-                    
-                    # Dispatch email with dynamic recipient override
-                    recipient = data.get("recipient_override")
-                    send_email(subject, body, frame=evidence_frame)
+                    # Update global context for Voice AI
+                    main_module._last_high_priority_event = summary
 
         data["alerts_dispatched"] = alerts_dispatched
         self._processed_count += 1
