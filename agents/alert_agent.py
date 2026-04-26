@@ -5,6 +5,7 @@ Includes cooldown logic to prevent duplicate consecutive alerts.
 """
 
 import time
+import cv2
 from datetime import datetime
 from typing import Any, Dict
 
@@ -91,6 +92,15 @@ class AlertAgent(BaseAgent):
                 incident_type = itype
                 priority = prio
                 description = data.get("high_priority_summary", inc.get("summary", ""))
+
+                # Encode image for attachment
+                image_bytes = None
+                if frame_result.annotated_frame is not None:
+                    try:
+                        _, buffer = cv2.imencode('.jpg', frame_result.annotated_frame)
+                        image_bytes = buffer.tobytes()
+                    except Exception as ie:
+                        logger.error(f"Image Encoding Error: {ie}")
 
                 # Construct the message
                 alert_msg = f"--- ALERTX SECURITY ALERT ---\n\n"
