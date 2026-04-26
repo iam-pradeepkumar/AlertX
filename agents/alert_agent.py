@@ -6,6 +6,7 @@ Includes cooldown logic to prevent duplicate consecutive alerts.
 
 import time
 import cv2
+import logging
 from datetime import datetime
 from typing import Any, Dict
 
@@ -16,6 +17,8 @@ from utils.email_service import send_email
 from utils.image_host import upload_frame
 # Import for updating global context
 import backend.main as main_module
+
+logger = logging.getLogger("alertx.agent.alert")
 
 
 class AlertAgent(BaseAgent):
