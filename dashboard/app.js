@@ -612,9 +612,9 @@ async function startFeed() {
         // ── ADAPTIVE FRAME LOOP (replaces setInterval to prevent request overlap) ──
         // Uses setTimeout chaining: next frame only captured AFTER previous response returns.
         // This guarantees zero request pile-up on slow mobile networks.
-        let adaptiveInterval = 500; // Start at 500ms (2 FPS)
-        const MIN_INTERVAL = 300;   // Fastest: ~3 FPS
-        const MAX_INTERVAL = 1500;  // Slowest: ~0.7 FPS (very slow network)
+        let adaptiveInterval = 1000; // Start at 1000ms (1 FPS) — safe for HF free-tier CPU
+        const MIN_INTERVAL = 300;    // Fastest: ~3 FPS (fast WiFi + powerful server)
+        const MAX_INTERVAL = 2500;   // Slowest: ~0.4 FPS (very slow mobile network)
 
         async function captureAndProcess() {
             if (!isLive || !isBrowserCamMode) return;

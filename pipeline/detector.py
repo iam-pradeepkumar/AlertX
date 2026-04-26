@@ -84,10 +84,15 @@ class YOLODetector:
             logger.error(f"Failed to load YOLO model: {e}")
             raise
 
-    def detect(self, frame: np.ndarray) -> FrameResult:
+    def detect(self, frame: np.ndarray, imgsz: int = 640, annotate: bool = True) -> FrameResult:
         """
         Run detection on a single frame.
         Returns FrameResult with detections, incidents, annotated frame.
+        
+        Args:
+            frame: Input BGR frame
+            imgsz: YOLO inference resolution (lower = faster, use 320 for phone streams)
+            annotate: If False, skip raw_frame copy and annotation drawing (faster for JSON-only responses)
         """
         if not self._loaded:
             self.load()
@@ -95,8 +100,9 @@ class YOLODetector:
         result = FrameResult()
         t0 = time.time()
         
-        # Save clean copy for secondary AI (CLIP)
-        result.raw_frame = frame.copy()
+        # Save clean copy for secondary AI (CLIP) — only when needed
+        if annotate:
+            result.raw_frame = frame.copy()
         
         # --- LIGHT PRE-PROCESSING ---
         # Removed internal resize to keep coordinates synced with client
@@ -109,7 +115,7 @@ class YOLODetector:
             iou=YOLO_IOU_THRESHOLD,
             verbose=False,
             device="cpu",
-            imgsz=640,
+            imgsz=imgsz,
         )
 
         result.inference_ms = round((time.time() - t0) * 1000, 1)
@@ -258,6 +264,11 @@ class YOLODetector:
         result.incidents = list(incident_map.values())
 
         # ── LIGHTWEIGHT ANNOTATION ──
+        # Skip entirely if caller only needs JSON coordinates (process_frame)
+        if not annotate:
+            result.annotated_frame = None
+            return result
+
         # We skip r.plot() because it's too heavy for cloud CPUs.
         annotated = frame.copy()
         

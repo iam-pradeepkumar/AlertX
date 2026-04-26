@@ -579,10 +579,22 @@ async def upload_video(file: UploadFile = File(...), current_user: str = Depends
     }
 
 
+# Frame throttle cache for browser cam (prevents CPU overload)
+_last_process_frame_time = 0.0
+_last_process_frame_result = None
+
 @app.post("/process_frame")
 async def process_frame(file: UploadFile = File(...), current_user: str = Depends(get_current_user)):
     """Process a single frame and return JSON coordinates for client-side drawing."""
-    global _last_activity_time
+    global _last_activity_time, _last_process_frame_time, _last_process_frame_result
+    
+    _last_activity_time = time.time()
+    
+    # PERF: Server-side frame throttle — if last detection was < 500ms ago,
+    # return cached result instantly to prevent CPU pile-up
+    now = time.time()
+    if _last_process_frame_result and (now - _last_process_frame_time) < 0.5:
+        return _last_process_frame_result
     
     contents = await file.read()
     nparr = np.frombuffer(contents, np.uint8)
@@ -590,23 +602,21 @@ async def process_frame(file: UploadFile = File(...), current_user: str = Depend
     
     if frame is None:
         return {"status": "error", "message": "Invalid image"}
-        
-    _last_activity_time = time.time()
 
     if not detector._loaded:
         detector.load()
     
     # PERF: Downscale large frames to 320px wide before detection
-    # Guarantees fast processing regardless of what the client sends
     h, w = frame.shape[:2]
     max_w = 320
     if w > max_w:
         scale = max_w / w
         frame = cv2.resize(frame, (max_w, int(h * scale)), interpolation=cv2.INTER_NEAREST)
         
-    # INCREASE QUALITY: Detect at 640px for better accuracy
-    # (Since we aren't encoding/sending a frame back, we can afford more AI power)
-    result = detector.detect(frame)
+    # PERF: Use imgsz=320 + annotate=False for ~4x faster inference
+    # - imgsz=320 prevents YOLO from upscaling 320px frame to 640px internally
+    # - annotate=False skips frame.copy() and all cv2 drawing calls
+    result = detector.detect(frame, imgsz=320, annotate=False)
     
     if result.incidents:
         run_agent_pipeline(result, source="browser_cam")
@@ -620,13 +630,19 @@ async def process_frame(file: UploadFile = File(...), current_user: str = Depend
             "conf": round(det.confidence, 2),
             "type": det.incident_type
         })
-        
-    return {
+    
+    response = {
         "status": "success",
         "detections": detections,
         "incidents": result.incidents,
         "person_count": result.person_count
     }
+    
+    # Cache result for throttle
+    _last_process_frame_time = now
+    _last_process_frame_result = response
+    
+    return response
 
 
 # ── Analyze ────────────────────────────────────
