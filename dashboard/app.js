@@ -464,12 +464,9 @@ async function startFeed() {
             const authData = await apiRequest('/auth/stream-token', 'POST', null, true);
             const ticket = authData.ticket;
 
-            if (source.startsWith('http')) {
-                console.log("AlertX: Using Direct-Stream mode for zero latency.");
-                feed.src = source;
-            } else {
-                feed.src = `${API_BASE}/video_feed?ticket=${ticket}&t=${new Date().getTime()}`;
-            }
+            // Always use the server-proxied stream to avoid Mixed Content errors (HTTPS -> HTTP)
+            // and to ensure AI bounding boxes are visible on the feed.
+            feed.src = `${API_BASE}/video_feed?ticket=${ticket}&t=${new Date().getTime()}`;
 
             feed.classList.remove('hidden');
             placeholder.classList.add('hidden');
