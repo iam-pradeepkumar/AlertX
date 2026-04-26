@@ -63,12 +63,14 @@ def send_email_alert(subject: str, body: str, frame=None, recipient: str = None)
             msg.attach(image_attachment)
 
         # Connect and send
+        logger.info(f"Connecting to {MAIL_SERVER}:{MAIL_PORT}...")
         with smtplib.SMTP(MAIL_SERVER, MAIL_PORT) as server:
             server.starttls()
+            logger.info(f"SMTP Login for {MAIL_USERNAME}...")
             server.login(MAIL_USERNAME, MAIL_PASSWORD)
             server.send_message(msg)
             
-        logger.info(f"Email alert sent to {target_email}")
+        logger.info(f"✅ SUCCESS: Email alert sent to {target_email}")
         return True
 
     except Exception as e:
