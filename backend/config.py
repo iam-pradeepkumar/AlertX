@@ -47,11 +47,19 @@ INCIDENT_CLASS_MAP = {
     "knife": "weapon",
     "scissors": "weapon",
     "baseball bat": "weapon",
-    "car": "vehicle",       # Internal label, logic will filter for "accident"
+    "handgun": "weapon",      # Custom model support
+    "rifle": "weapon",
+    "car": "vehicle",
     "truck": "vehicle",
     "bus": "vehicle",
     "motorcycle": "vehicle",
+    "bicycle": "vehicle",
     "person": "person",
+    "cell phone": "electronic",
+    "laptop": "electronic",
+    "backpack": "luggage",
+    "handbag": "luggage",
+    "suitcase": "luggage",
 }
 
 # How many persons in single frame = crowd alert

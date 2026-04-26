@@ -130,11 +130,8 @@ class AlertXEnsemble:
             bbox = tuple(box.xyxy[0].tolist())
             incident_type = INCIDENT_CLASS_MAP.get(class_name, "")
 
-            if not incident_type: continue
-            
-            # Confidence filtering (Ensemble logic: Fire/Weapon need more certainty)
-            threshold = WEAPON_CONF_THRESHOLD if incident_type in ["weapon", "fire"] else YOLO_CONF_THRESHOLD
-            if conf < threshold: continue
+            # General confidence filter for all objects (including phones, bags, etc.)
+            if conf < 0.35: continue 
 
             result.detections.append(Detection(
                 class_name=class_name,
@@ -217,6 +214,26 @@ class AlertXEnsemble:
                 "confidence": 0.85,
                 "details": "Vehicle collision or pedestrian accident identified",
                 "priority": "HIGH"
+            }
+
+        # --- E. GENERAL ANOMALY DETECTION ---
+        # 1. Crowd Detection
+        if result.person_count >= 15:
+            incident_map["anomaly"] = {
+                "type": "anomaly",
+                "confidence": min(0.4 + (result.person_count / 50.0), 0.95),
+                "details": f"Large crowd gathering detected ({result.person_count} persons)",
+                "priority": "MEDIUM"
+            }
+
+        # 2. Unattended Luggage (Heuristic)
+        luggage = [d for d in result.detections if d.incident_type == "luggage"]
+        if luggage and not persons:
+            incident_map["anomaly_luggage"] = {
+                "type": "anomaly",
+                "confidence": 0.70,
+                "details": "Potential unattended baggage in sector",
+                "priority": "MEDIUM"
             }
 
         result.incidents = list(incident_map.values())
