@@ -471,13 +471,19 @@ def _video_generator():
 async def video_feed(ticket: str = Query(...)):
     """Video streaming route. Uses high-security one-time tickets."""
     expiry = _stream_tickets.get(ticket)
+    
+    # 1. Check if valid
     if not expiry or time.time() > expiry:
-        # Clean up expired
-        if ticket in _stream_tickets: del _stream_tickets[ticket]
+        if ticket in _stream_tickets: 
+            del _stream_tickets[ticket]
+        logger.warning(f"SECURITY ALERT: Unauthorized access attempt to live feed (Invalid Ticket: {ticket[:8]})")
         raise HTTPException(status_code=401, detail="Stream ticket invalid or expired")
     
-    # Optional: Log the access
-    logger.info(f"Stream access authorized via ticket {ticket[:8]}...")
+    # 2. CONSUME TICKET (One-Time Use Security)
+    # This prevents hackers from copying the stream URL and viewing it elsewhere!
+    del _stream_tickets[ticket]
+    
+    logger.info(f"Stream access authorized securely via one-time ticket {ticket[:8]}...")
     
     return StreamingResponse(
         _video_generator(), 
