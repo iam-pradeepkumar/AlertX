@@ -387,9 +387,9 @@ def _live_processing_loop():
             time.sleep(0.01)
             continue
 
-        # LAG FIX: Drastic skipping for Hugging Face Free Tier
-        # We only detect every 10-20 frames to ensure zero backlog lag
-        skip_factor = 20 if _is_processing_incident else 10
+        # LAG FIX: Optimized skipping for responsive real-time monitoring
+        # Since imgsz is now 320, we can detect more frequently
+        skip_factor = 10 if _is_processing_incident else 5
         
         if frame_idx % skip_factor == 0:
             try:

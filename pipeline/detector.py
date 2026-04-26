@@ -92,13 +92,21 @@ class AlertXEnsemble:
             logger.error(f"Failed to load YOLO model: {e}")
             raise
 
-    def detect(self, frame: np.ndarray, imgsz: int = 640, annotate: bool = True) -> FrameResult:
+    def detect(self, frame: np.ndarray, imgsz: int = 320, annotate: bool = True) -> FrameResult:
         if not self._loaded:
             self.load()
 
         result = FrameResult()
         t0 = time.time()
         
+        # PERF: Internal downscale for ultra-fast CPU inference
+        h, w = frame.shape[:2]
+        if w > 320:
+            scale = 320 / w
+            proc_frame = cv2.resize(frame, (320, int(h * scale)), interpolation=cv2.INTER_NEAREST)
+        else:
+            proc_frame = frame
+
         if annotate:
             result.raw_frame = frame.copy()
         
@@ -106,7 +114,7 @@ class AlertXEnsemble:
 
         # 1. CORE YOLO INFERENCE (Ensemble Base)
         results = self._model(
-            frame,
+            proc_frame,
             conf=YOLO_CONF_THRESHOLD,
             iou=YOLO_IOU_THRESHOLD,
             verbose=False,
@@ -123,14 +131,24 @@ class AlertXEnsemble:
         # 2. OBJECT EXTRACTION
         r = results[0]
         names = r.names
+        orig_h, orig_w = frame.shape[:2]
+        proc_h, proc_w = proc_frame.shape[:2]
+        
         for box in r.boxes:
             cls_id = int(box.cls[0])
             conf = float(box.conf[0])
             class_name = names.get(cls_id, "unknown")
-            bbox = tuple(box.xyxy[0].tolist())
+            
+            # Rescale bbox back to original frame size
+            b = box.xyxy[0].tolist()
+            bbox = (
+                b[0] * orig_w / proc_w,
+                b[1] * orig_h / proc_h,
+                b[2] * orig_w / proc_w,
+                b[3] * orig_h / proc_h
+            )
+            
             incident_type = INCIDENT_CLASS_MAP.get(class_name, "")
-
-            # General confidence filter for all objects (including phones, bags, etc.)
             if conf < 0.35: continue 
 
             result.detections.append(Detection(

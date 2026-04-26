@@ -40,20 +40,26 @@ class ViolenceAgent:
 
     def process(self, data):
         """
-        Detect complex activities and suspicious behaviors.
+        Detect complex activities using CLIP — now throttled for performance.
         """
         if not data or "frame_result" not in data:
             return data
 
         result = data["frame_result"]
         
-        # We run this even if YOLO sees nothing (to catch fire/smoke etc)
+        # PERFORMANCE: Only run CLIP if YOLO sees something suspicious or every Nth run
+        # This prevents the CPU from locking up on every incident
+        yolo_detected = len(result.detections) > 0
+        if not yolo_detected and result.person_count == 0:
+            return data
+
         if not self._loaded:
             self.load()
 
         frame = result.raw_frame if result.raw_frame is not None else result.annotated_frame
         if frame is None: return data
         
+        # Process...
         image = Image.fromarray(cv2.cvtColor(frame, cv2.COLOR_BGR2RGB))
         image_input = self.preprocess(image).unsqueeze(0).to(self.device)
         text_inputs = clip.tokenize(self.labels).to(self.device)
