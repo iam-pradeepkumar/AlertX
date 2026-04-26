@@ -536,6 +536,24 @@ async def stop_camera(current_user: str = Depends(get_current_user)):
     return {"status": "stopped"}
 
 
+@app.get("/status")
+async def get_status(current_user: str = Depends(get_current_user)):
+    """System health and node status."""
+    from backend.models import SQLALCHEMY_DATABASE_URL
+    is_cloud = "supabase" in SQLALCHEMY_DATABASE_URL.lower() or "postgres" in SQLALCHEMY_DATABASE_URL.lower()
+    return {
+        "camera_active": frame_grabber.is_running if frame_grabber else False,
+        "processing_active": _processing_live,
+        "is_incident_active": _is_processing_incident,
+        "alert_recipient": _alert_recipient,
+        "db_mode": "Cloud (Supabase)" if is_cloud else "Local (SQLite)",
+        "last_sync": datetime.now().isoformat(),
+        "events": {
+            "total_events": event_store.get_stats()["total_events"]
+        }
+    }
+
+
 # ── Upload ─────────────────────────────────────
 @app.post("/upload")
 async def upload_video(file: UploadFile = File(...), current_user: str = Depends(get_current_user)):

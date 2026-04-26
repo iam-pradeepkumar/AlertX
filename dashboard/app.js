@@ -318,7 +318,12 @@ async function updateStatus() {
         document.getElementById('stat-high').textContent = high;
         
         const statusMsg = document.getElementById('system-status-msg');
-        if (statusMsg) statusMsg.textContent = data.camera_active ? "AI Node Online" : "AI Node Standby";
+        if (statusMsg) {
+            const dbBadge = data.db_mode === "Cloud (Supabase)" ? 
+                '<span style="color: #10b981; font-weight: bold;">[☁️ Cloud Active]</span>' : 
+                '<span style="color: #f59e0b; font-weight: bold;">[💾 Local Mode]</span>';
+            statusMsg.innerHTML = (data.camera_active ? "AI Node Online " : "AI Node Standby ") + dbBadge;
+        }
 
         // AUTO-VIEW: If a camera is active elsewhere, show it here too
         if (data.camera_active && !isLive) {

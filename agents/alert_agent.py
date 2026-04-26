@@ -11,6 +11,7 @@ from agents.base_agent import BaseAgent
 from backend.config import ALERT_COOLDOWN
 from backend.event_store import Event, EventStore
 from utils.email_service import send_email_alert
+from utils.discord_service import send_discord_alert
 from utils.image_host import upload_frame
 # Import for updating global context
 import backend.main as main_module
@@ -97,6 +98,9 @@ class AlertAgent(BaseAgent):
                 # Dispatch email with dynamic recipient override
                 recipient = data.get("recipient_override")
                 send_email_alert(subject, body, frame=evidence_frame, recipient=recipient)
+                
+                # ALSO Dispatch to Discord (Reliable on Hugging Face)
+                send_discord_alert(subject, body, frame=evidence_frame)
 
         data["alerts_dispatched"] = alerts_dispatched
         self._processed_count += 1
