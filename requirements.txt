@@ -21,6 +21,6 @@ torch
 torchvision
 ftfy
 regex
-supabase
+firebase-admin
 sendgrid
 clip @ git+https://github.com/openai/CLIP.git

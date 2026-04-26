@@ -34,7 +34,8 @@ from backend.auth import (
     create_access_token, 
     get_current_user
 )
-from backend.models import get_db, User, Event, SessionLocal
+from backend.models import get_db, User, Event, SQLALCHEMY_DATABASE_URL
+from utils.firebase_service import init_firebase, get_firestore
 from backend.config import (
     BASE_DIR,
     UPLOAD_DIR,
@@ -75,6 +76,7 @@ app = FastAPI(
     version="1.0.0",
     description="Real-time incident detection from live CCTV and uploaded video.",
 )
+init_firebase() # Start Firebase
 
 app.add_middleware(
     CORSMiddleware,
@@ -215,28 +217,12 @@ async def download_db(current_user: str = Depends(get_current_user)):
     raise HTTPException(status_code=404, detail="Database file not found")
 
 @app.get("/events")
-async def get_events(limit: int = 50, incident_type: str = None, db: Session = Depends(get_db), current_user: str = Depends(get_current_user)):
-    """Fetch events (Hybird: DB + Recent Memory)."""
+async def get_events(limit: int = 50, incident_type: str = None, db = Depends(get_db), current_user: str = Depends(get_current_user)):
+    """Fetch events (Hybird: Firebase + Recent Memory)."""
     try:
-        # Get from DB
-        query = db.query(Event)
-        if incident_type:
-            query = query.filter(Event.incident_type == incident_type)
-        db_events = query.order_by(Event.timestamp.desc()).limit(limit).all()
+        # Get from Firebase
+        formatted = db.get_events(limit)
         
-        # Format
-        formatted = []
-        for e in db_events:
-            formatted.append({
-                "id": e.id,
-                "timestamp": e.timestamp.isoformat(),
-                "incident_type": e.incident_type,
-                "confidence": e.confidence,
-                "priority": e.priority or "MEDIUM",
-                "description": e.description,
-                "source": e.source
-            })
-            
         # Also include recent memory events if DB is empty
         if not formatted:
             mem_events = event_store.get_events(limit)
@@ -315,8 +301,7 @@ def _bg_agent_task(frame_result, source, frame_index, recipient):
                     )
                     event_store.add_event(mem_event)
                 
-                # Save to persistent DB
-                db = SessionLocal()
+                # Save to persistent Firebase
                 try:
                     # Get priority from the first high-priority incident
                     top_priority = "MEDIUM"
@@ -328,21 +313,20 @@ def _bg_agent_task(frame_result, source, frame_index, recipient):
                             top_priority = "HIGH"
                             
                     for inc in frame_result.incidents:
-                        new_event = Event(
-                            incident_type=inc.get("type", "unknown"),
-                            confidence=float(inc.get("confidence", 0.0)),
-                            priority=inc.get("priority", top_priority),
-                            source=source,
-                            description=data.get("high_priority_summary", ""),
-                            screenshot_path=frame_result.screenshot_path
-                        )
-                        db.add(new_event)
-                    db.commit()
-                    logger.info(f"Database: Saved {len(frame_result.incidents)} incidents.")
+                        event_data = {
+                            "incident_type": inc.get("type", "unknown"),
+                            "confidence": float(inc.get("confidence", 0.0)),
+                            "priority": inc.get("priority", top_priority),
+                            "source": source,
+                            "description": data.get("high_priority_summary", ""),
+                            "screenshot_path": frame_result.screenshot_path
+                        }
+                        # Save via DBStore helper
+                        from backend.models import DBStore
+                        DBStore.save_event(event_data)
+                    logger.info(f"Firebase Cloud: Saved {len(frame_result.incidents)} incidents.")
                 except Exception as dbe:
-                    logger.error(f"Database Save Error: {dbe}")
-                finally:
-                    db.close()
+                    logger.error(f"Firebase Save Error: {dbe}")
             except Exception as e_mem:
                 logger.error(f"Event Store Error: {e_mem}")
             
