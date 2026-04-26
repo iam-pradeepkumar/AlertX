@@ -180,30 +180,25 @@ class SignupRequest(BaseModel):
     password: str
 
 @app.post("/auth/signup")
-async def signup(request: SignupRequest, db: Session = Depends(get_db)):
+async def signup(request: SignupRequest, db = Depends(get_db)):
     """Create a new user account."""
-    # Check if user exists
-    existing_user = db.query(User).filter(User.username == request.username).first()
+    # Check if user exists (Firebase mode)
+    existing_user = db.get_user(request.username)
     if existing_user:
         raise HTTPException(status_code=400, detail="Username already registered")
     
-    new_user = User(
-        username=request.username,
-        email=request.email,
-        hashed_password=get_password_hash(request.password)
-    )
-    db.add(new_user)
-    db.commit()
+    hashed_password = get_password_hash(request.password)
+    db.save_user(request.username, request.email, hashed_password)
     return {"status": "success", "message": "User created successfully"}
 
 @app.post("/auth/login")
-async def login(form_data: OAuth2PasswordRequestForm = Depends(), db: Session = Depends(get_db)):
+async def login(form_data: OAuth2PasswordRequestForm = Depends(), db = Depends(get_db)):
     """Verify user and return JWT token."""
-    user = db.query(User).filter(User.username == form_data.username).first()
-    if not user or not verify_password(form_data.password, user.hashed_password):
+    user_data = db.get_user(form_data.username)
+    if not user_data or not verify_password(form_data.password, user_data.get("hashed_password")):
         raise HTTPException(status_code=401, detail="Incorrect username or password")
     
-    access_token = create_access_token(data={"sub": user.username})
+    access_token = create_access_token(data={"sub": user_data["username"]})
     return {"access_token": access_token, "token_type": "bearer"}
 
 from fastapi.responses import StreamingResponse, JSONResponse, HTMLResponse, FileResponse
