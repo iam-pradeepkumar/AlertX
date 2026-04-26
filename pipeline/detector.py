@@ -81,13 +81,13 @@ class AlertXEnsemble:
             try:
                 # Force weights_only=False for the duration of model loading
                 torch.load = lambda *args, **kwargs: _original_load(*args, **{**kwargs, 'weights_only': False})
-                self._model = YOLO(self._model_path)
+                self._model = YOLO(self.model_name)
             finally:
                 # Restore original torch.load
                 torch.load = _original_load
 
             self._loaded = True
-            logger.info(f"YOLO model loaded: {self._model_path}")
+            logger.info(f"YOLO model loaded: {self.model_name}")
         except Exception as e:
             logger.error(f"Failed to load YOLO model: {e}")
             raise
