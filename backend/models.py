@@ -1,19 +1,31 @@
 import os
+import re
 from sqlalchemy import Column, Integer, String, Boolean, Float, DateTime, create_engine
 from sqlalchemy.orm import sessionmaker, declarative_base
 from datetime import datetime
 
 # Database setup
 # DYNAMIC: Use Supabase if DATABASE_URL is set, otherwise use local SQLite
-SQLALCHEMY_DATABASE_URL = os.getenv("DATABASE_URL", "sqlite:///./alertx.db")
+raw_url = os.getenv("DATABASE_URL", "sqlite:///./alertx.db").strip()
 
-# Fix for Supabase (they use postgres:// but SQLAlchemy needs postgresql://)
-if SQLALCHEMY_DATABASE_URL.startswith("postgres://"):
-    SQLALCHEMY_DATABASE_URL = SQLALCHEMY_DATABASE_URL.replace("postgres://", "postgresql://", 1)
+# SECURITY & FORMAT FIXES
+if "postgres://" in raw_url:
+    # SQLAlchemy requires postgresql://
+    raw_url = raw_url.replace("postgres://", "postgresql://", 1)
+
+if "[YOUR-PASSWORD]" in raw_url:
+    print("⚠️ WARNING: You forgot to replace [YOUR-PASSWORD] in your DATABASE_URL!")
+    # Fallback to local to prevent crash
+    SQLALCHEMY_DATABASE_URL = "sqlite:///./alertx.db"
+else:
+    SQLALCHEMY_DATABASE_URL = raw_url
 
 engine = create_engine(
-    SQLALCHEMY_DATABASE_URL, 
-    connect_args={"check_same_thread": False} if "sqlite" in SQLALCHEMY_DATABASE_URL else {}
+    SQLALCHEMY_DATABASE_URL,
+    # Only use check_same_thread for SQLite
+    connect_args={"check_same_thread": False} if "sqlite" in SQLALCHEMY_DATABASE_URL else {
+        "sslmode": "require" # Recommended for Supabase
+    }
 )
 SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
 Base = declarative_base()
