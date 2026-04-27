@@ -35,6 +35,7 @@ from backend.auth import (
     get_current_user
 )
 from backend.models import get_db, User, Event, SQLALCHEMY_DATABASE_URL
+from utils.firebase_service import init_firebase, get_firestore
 from backend.config import (
     BASE_DIR,
     UPLOAD_DIR,
@@ -75,6 +76,7 @@ app = FastAPI(
     version="1.0.0",
     description="Real-time incident detection from live CCTV and uploaded video.",
 )
+init_firebase() # Start Firebase
 
 app.add_middleware(
     CORSMiddleware,
@@ -545,7 +547,7 @@ async def system_status(current_user: str = Depends(get_current_user)):
         "is_incident_active": _is_processing_incident,
         "model_loaded": detector.is_loaded,
         "alert_recipient": _alert_recipient,
-        "db_mode": "Local Storage (Secure)",
+        "db_mode": "Cloud (Firebase)",
         "last_sync": datetime.now().isoformat(),
         "agents": {
             "detection": detection_agent.stats,
