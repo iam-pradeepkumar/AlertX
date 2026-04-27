@@ -13,7 +13,7 @@
     <!-- Leaflet Maps -->
     <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
     
-    <link rel="stylesheet" href="style.css?v=1.8">
+    <link rel="stylesheet" href="style.css?v=1.9">
 </head>
 <body>
     
@@ -145,15 +145,9 @@
                         <p id="system-status-msg">All AI nodes operational | Processing @ 30 FPS</p>
                     </div>
                     <div class="status-indicator">
-                        <span class="status-dot status-dot--online"></span>
-                        <span id="status-text">Server Sync Active</span>
-                        <select id="filter-type" class="select-filter" style="margin-left: 1rem;">
-                            <option value="all">All Channels</option>
-                            <option value="weapon">Weapon Detection</option>
-                            <option value="fire">Fire/Smoke</option>
-                            <option value="violence">Violence</option>
-                        </select>
-                        <button class="btn btn--sm btn--ghost" id="btn-refresh-stats" style="margin-left: 0.5rem;">🔄 Sync</button>
+                        <span class="status-dot status-dot--online" id="status-indicator-dot"></span>
+                        <span id="status-text">Server Online</span>
+                        <button class="btn btn--sm btn--ghost" id="btn-refresh-stats" style="margin-left: 0.8rem;">🔄 Sync</button>
                     </div>
                 </header>
 
@@ -328,6 +322,6 @@
 
     <!-- Scripts -->
     <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
-    <script src="app.js?v=1.8"></script>
+    <script src="app.js?v=1.9"></script>
 </body>
 </html>

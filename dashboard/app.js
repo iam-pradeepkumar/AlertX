@@ -520,17 +520,30 @@ function initPolling() {
 }
 
 async function updateStatus() {
+    const statusText = document.getElementById('status-text');
+    const statusDot = document.getElementById('status-indicator-dot');
+    
     try {
         const data = await apiRequest('/status');
         
+        if (statusText) statusText.textContent = "Server Online";
+        if (statusDot) {
+            statusDot.className = "status-dot status-dot--online";
+            statusDot.style.background = "var(--online)";
+        }
+
         const eventData = await apiRequest('/events?limit=100');
         const events = eventData.events || [];
         
-        document.getElementById('stat-total').textContent = events.length;
+        const statTotalEl = document.getElementById('stat-total');
+        if (statTotalEl) statTotalEl.textContent = events.length;
         
         const critical = events.filter(e => e.priority === 'CRITICAL').length;
         const high = events.filter(e => e.priority === 'HIGH').length;
-        document.getElementById('stat-critical').textContent = critical;
+        
+        const statCriticalEl = document.getElementById('stat-critical');
+        if (statCriticalEl) statCriticalEl.textContent = critical;
+        
         const statHighEl = document.getElementById('stat-high');
         if (statHighEl) statHighEl.textContent = high;
         
@@ -542,9 +555,7 @@ async function updateStatus() {
             statusMsg.innerHTML = (data.camera_active ? "AI Node Online " : "AI Node Standby ") + dbBadge;
         }
 
-        // AUTO-VIEW: If a camera is active elsewhere, show it here too
         if (data.camera_active && !isLive) {
-            console.log("AlertX: Active node detected on another device. Syncing feed...");
             const authData = await apiRequest('/auth/stream-token', 'POST', null, true);
             const ticket = authData.ticket;
             const feed = document.getElementById('video-feed');
@@ -557,36 +568,27 @@ async function updateStatus() {
             isLive = true;
             btn.textContent = "Node Online";
         }
-    } catch (e) { console.error(e); }
+    } catch (e) { 
+        console.error("AlertX: Server unreachable", e); 
+        if (statusText) statusText.textContent = "Server Offline";
+        if (statusDot) {
+            statusDot.className = "status-dot";
+            statusDot.style.background = "var(--critical)";
+        }
+    }
 }
 
 async function updateEvents() {
     try {
-        const filterVal = document.getElementById('filter-type').value;
-        let url = `/events?limit=25`;
-        
-        if (filterVal) {
-            const [prefix, value] = filterVal.split(':');
-            if (prefix === 'p') url += `&priority=${value}`;
-            else if (prefix === 't') url += `&incident_type=${value}`;
-        }
-        
-        const data = await apiRequest(url);
+        const data = await apiRequest(`/events?limit=25`);
         const events = data.events || [];
         
         const container = document.getElementById('event-list');
         const header = document.querySelector('.events-section h3');
-        
-        if (filterVal) {
-            const [prefix, value] = filterVal.split(':');
-            const label = value.toUpperCase();
-            header.innerHTML = `Activity Log <span style="font-size: 0.65rem; color: var(--accent); background: var(--accent-glow); padding: 2px 6px; border-radius: 4px; margin-left: 8px;">Filter: ${label}</span>`;
-        } else {
-            header.innerHTML = `Activity Log`;
-        }
+        if (header) header.innerHTML = `Activity Log`;
 
         if (events.length === 0) {
-            container.innerHTML = `<li style="padding: 2rem; text-align: center; color: var(--text-secondary);">No events found matching the current filter.</li>`;
+            if (container) container.innerHTML = `<li style="padding: 2rem; text-align: center; color: var(--text-secondary);">No incidents logged.</li>`;
             return;
         }
 
@@ -1044,10 +1046,6 @@ function init() {
         updateStatus();
         updateEvents();
         showToast("System data synchronized", "info");
-    });
-
-    addListener('filter-type', 'onchange', () => {
-        updateEvents();
     });
 }
 
