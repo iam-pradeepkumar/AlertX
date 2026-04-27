@@ -84,6 +84,9 @@ body {
     overflow-y: auto;
 }
 
+.auth-card::-webkit-scrollbar { width: 5px; }
+.auth-card::-webkit-scrollbar-thumb { background: var(--border); border-radius: 10px; }
+
 .auth-card .logo { margin-bottom: 2rem; justify-content: center; }
 
 .form-group { margin-bottom: 1.5rem; text-align: left; }
