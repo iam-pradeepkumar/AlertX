@@ -184,18 +184,27 @@ class SignupRequest(BaseModel):
 @app.post("/auth/signup")
 async def signup(request: SignupRequest, db = Depends(get_db)):
     """Create a new user account."""
+    if db is None or get_firestore() is None:
+        raise HTTPException(status_code=503, detail="Database link offline. Please restore credentials.json.")
+        
     # Check if user exists (Firebase mode)
     existing_user = db.get_user(request.username)
     if existing_user:
         raise HTTPException(status_code=400, detail="Username already registered")
     
     hashed_password = get_password_hash(request.password)
-    db.save_user(request.username, request.email, hashed_password, request.role, request.badge_id)
+    success = db.save_user(request.username, request.email, hashed_password, request.role, request.badge_id)
+    if not success:
+        raise HTTPException(status_code=500, detail="Failed to save user data to cloud.")
+        
     return {"status": "success", "message": "User created successfully"}
 
 @app.post("/auth/login")
 async def login(form_data: OAuth2PasswordRequestForm = Depends(), db = Depends(get_db)):
     """Verify user and return JWT token."""
+    if db is None or get_firestore() is None:
+        raise HTTPException(status_code=503, detail="Database link offline. Please restore credentials.json.")
+
     user_data = db.get_user(form_data.username)
     if not user_data or not verify_password(form_data.password, user_data.get("hashed_password")):
         raise HTTPException(status_code=401, detail="Incorrect username or password")
