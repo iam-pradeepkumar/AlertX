@@ -316,15 +316,19 @@ async function findNearbyServices(pos, radius = 10000) {
     const lat = pos[0];
     const lon = pos[1];
 
-    // Broaden search to include more emergency-related tags
+    // Broaden search to include more emergency-related tags and relations, and increase limit
     const query = `
         [out:json][timeout:30];
         (
-          node["amenity"~"police|hospital|fire_station|ambulance_station|emergency_phone|doctor|pharmacy"](around:${radius},${lat},${lon});
-          way["amenity"~"police|hospital|fire_station|ambulance_station"](around:${radius},${lat},${lon});
-          node["emergency"~"yes|phone|defibrillator"](around:${radius},${lat},${lon});
+          node["amenity"~"police|hospital|clinic|fire_station|ambulance_station|doctor|pharmacy"](around:${radius},${lat},${lon});
+          way["amenity"~"police|hospital|clinic|fire_station|ambulance_station"](around:${radius},${lat},${lon});
+          relation["amenity"~"police|hospital|clinic|fire_station|ambulance_station"](around:${radius},${lat},${lon});
+          node["healthcare"](around:${radius},${lat},${lon});
+          way["healthcare"](around:${radius},${lat},${lon});
+          relation["healthcare"](around:${radius},${lat},${lon});
+          node["emergency"](around:${radius},${lat},${lon});
         );
-        out center body 20;
+        out center 100;
     `;
 
     try {
@@ -420,8 +424,9 @@ async function findNearbyServices(pos, radius = 10000) {
         }).filter(s => s !== null);
 
         services.sort((a, b) => a.dist - b.dist);
+        const topServices = services.slice(0, 20);
 
-        container.innerHTML = services.map(s => `
+        container.innerHTML = topServices.map(s => `
             <div class="service-card tactical-card" style="border-left: 4px solid ${s.color};">
                 <div class="tactical-card__icon">${s.icon}</div>
                 <div class="tactical-card__info">
