@@ -320,9 +320,9 @@ async function findNearbyServices(pos, radius = 10000) {
     const query = `
         [out:json][timeout:30];
         (
-          node["amenity"~"police|hospital|clinic|fire_station|ambulance_station|doctor|pharmacy"](around:${radius},${lat},${lon});
-          way["amenity"~"police|hospital|clinic|fire_station|ambulance_station"](around:${radius},${lat},${lon});
-          relation["amenity"~"police|hospital|clinic|fire_station|ambulance_station"](around:${radius},${lat},${lon});
+          node["amenity"~"police|hospital|clinic|fire_station|ambulance_station|doctor|pharmacy|college|university"](around:${radius},${lat},${lon});
+          way["amenity"~"police|hospital|clinic|fire_station|ambulance_station|college|university"](around:${radius},${lat},${lon});
+          relation["amenity"~"police|hospital|clinic|fire_station|ambulance_station|college|university"](around:${radius},${lat},${lon});
           node["healthcare"](around:${radius},${lat},${lon});
           way["healthcare"](around:${radius},${lat},${lon});
           relation["healthcare"](around:${radius},${lat},${lon});
@@ -390,9 +390,10 @@ async function findNearbyServices(pos, radius = 10000) {
             let icon = '🛡️';
             let color = '#3b82f6'; // Blue
             if (type === 'police') { icon = '🚓'; color = '#2563eb'; }
-            if (type.includes('hospital') || type.includes('ambulance')) { icon = '🏥'; color = '#ef4444'; }
+            if (type.includes('hospital') || type.includes('ambulance') || type.includes('clinic') || type.includes('healthcare')) { icon = '🏥'; color = '#ef4444'; }
             if (type === 'fire_station') { icon = '🚒'; color = '#f97316'; }
             if (type === 'doctor' || type === 'pharmacy') { icon = '⚕️'; color = '#10b981'; }
+            if (type.includes('college') || type.includes('university')) { icon = '🎓'; color = '#8b5cf6'; }
 
             // Tactical Pulse Marker
             const pulseIcon = L.divIcon({
