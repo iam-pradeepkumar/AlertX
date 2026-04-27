@@ -182,6 +182,15 @@ function switchOverlay(overlayId) {
 function initMap() {
     if (map) return;
     
+    // Live Clock for Geo-Intelligence Panel
+    setInterval(() => {
+        const timeEl = document.getElementById('live-sector-time');
+        if (timeEl) {
+            const now = new Date();
+            timeEl.innerHTML = `LIVE: ${now.toLocaleDateString()} ${now.toLocaleTimeString()}`;
+        }
+    }, 1000);
+    
     map = L.map('map').setView(userPos, 13);
     
     // Real Satellite View (Esri World Imagery)
@@ -291,8 +300,16 @@ async function findNearbyServices(pos) {
             if (type === 'fire_station') icon = '🚒';
             if (type === 'doctor') icon = '👨‍⚕️';
 
-            // Add Marker to map
-            const marker = L.marker([elLat, elLon]).addTo(map)
+            // Add Marker to map with custom divIcon
+            const customIcon = L.divIcon({
+                className: 'custom-sector-icon',
+                html: `<div style="font-size: 28px; filter: drop-shadow(0 2px 4px rgba(0,0,0,0.5)); text-align: center; line-height: 1;">${icon}</div>`,
+                iconSize: [30, 30],
+                iconAnchor: [15, 15],
+                popupAnchor: [0, -15]
+            });
+            
+            const marker = L.marker([elLat, elLon], { icon: customIcon }).addTo(map)
                 .bindPopup(`<b>${icon} ${name}</b><br>${type.toUpperCase()} UNIT`);
             window.serviceMarkers.push(marker);
 
