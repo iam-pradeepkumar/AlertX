@@ -446,7 +446,6 @@ async function findNearbyServices(pos, radius = 10000) {
             </div>`;
     }
 }
-}
 
 // ── UPLOAD LOGIC ────────────────────────────────
 
