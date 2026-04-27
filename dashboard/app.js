@@ -246,32 +246,60 @@ function initMap() {
     }
 }
 
-async function findNearbyServices(pos) {
+async function findNearbyServices(pos, radius = 10000) {
     const container = document.getElementById('nearby-services');
-    container.innerHTML = '<div style="text-align:center; padding:2rem;"><span class="spinner-sm"></span><p style="font-size:0.8rem; color:#8b8ba3; margin-top:10px;">Scanning sector via Overpass AI...</p></div>';
+    if (!container) return;
+    
+    container.innerHTML = `
+        <div style="text-align:center; padding:2rem;">
+            <span class="spinner-sm"></span>
+            <p style="font-size:0.8rem; color:#8b8ba3; margin-top:10px;">Scanning sector (${radius/1000}km)...</p>
+        </div>`;
 
     const lat = pos[0];
     const lon = pos[1];
-    const radius = 10000; // 10km
 
+    // Broaden search to include more emergency-related tags
     const query = `
-        [out:json][timeout:25];
+        [out:json][timeout:30];
         (
-          node["amenity"~"police|hospital|fire_station|ambulance_station|emergency_phone|doctor"](around:${radius},${lat},${lon});
+          node["amenity"~"police|hospital|fire_station|ambulance_station|emergency_phone|doctor|pharmacy"](around:${radius},${lat},${lon});
           way["amenity"~"police|hospital|fire_station|ambulance_station"](around:${radius},${lat},${lon});
+          node["emergency"~"yes|phone|defibrillator"](around:${radius},${lat},${lon});
         );
-        out center body 15;
+        out center body 20;
     `;
 
     try {
+        const controller = new AbortController();
+        const timeoutId = setTimeout(() => controller.abort(), 35000); // 35s timeout
+
         const response = await fetch("https://overpass-api.de/api/interpreter", {
             method: "POST",
-            body: query
+            body: query,
+            signal: controller.signal
         });
+        
+        clearTimeout(timeoutId);
+
+        if (!response.ok) {
+            if (response.status === 429) throw new Error("Server busy. Retrying...");
+            throw new Error(`Overpass API Error: ${response.status}`);
+        }
+
         const data = await response.json();
         
         if (!data.elements || data.elements.length === 0) {
-            container.innerHTML = '<p style="text-align:center; color:#8b8ba3;">No verified units in sector.</p>';
+            if (radius < 30000) {
+                // Try broader search if nothing found
+                console.log(`No units in ${radius}m, expanding search...`);
+                return findNearbyServices(pos, radius + 10000);
+            }
+            container.innerHTML = `
+                <div style="text-align:center; padding:1.5rem;">
+                    <p style="color:#8b8ba3; font-size:0.8rem;">No verified units detected in this sector (30km scan).</p>
+                    <button onclick="findNearbyServices([${lat}, ${lon}])" class="btn btn--ghost btn--sm" style="margin-top:10px;">Deep Scan</button>
+                </div>`;
             return;
         }
 
@@ -290,52 +318,57 @@ async function findNearbyServices(pos) {
         };
 
         const services = data.elements.map(el => {
-            const elLat = el.lat || el.center.lat;
-            const elLon = el.lon || el.center.lon;
-            const type = el.tags.amenity || 'emergency';
-            const name = el.tags.name || `Verified ${type.replace('_', ' ')}`;
+            const elLat = el.lat || (el.center ? el.center.lat : null);
+            const elLon = el.lon || (el.center ? el.center.lon : null);
+            if (!elLat || !elLon) return null;
+
+            const type = el.tags.amenity || el.tags.emergency || 'emergency';
+            const name = el.tags.name || `Unit: ${type.replace(/_/g, ' ').toUpperCase()}`;
+            
             let icon = '🛡️';
             if (type === 'police') icon = '🚓';
             if (type.includes('hospital') || type.includes('ambulance')) icon = '🏥';
             if (type === 'fire_station') icon = '🚒';
-            if (type === 'doctor') icon = '👨‍⚕️';
+            if (type === 'doctor' || type === 'pharmacy') icon = '⚕️';
 
-            // Add Marker to map with custom divIcon
             const customIcon = L.divIcon({
                 className: '',
-                html: `<div style="font-size: 28px; filter: drop-shadow(0 2px 4px rgba(0,0,0,0.5)); text-align: center; line-height: 1;">${icon}</div>`,
+                html: `<div style="font-size: 24px; filter: drop-shadow(0 2px 4px rgba(0,0,0,0.5));">${icon}</div>`,
                 iconSize: [30, 30],
-                iconAnchor: [15, 15],
-                popupAnchor: [0, -15]
+                iconAnchor: [15, 15]
             });
             
             const marker = L.marker([elLat, elLon], { icon: customIcon }).addTo(map)
-                .bindPopup(`<b>${icon} ${name}</b><br>${type.toUpperCase()} UNIT`);
+                .bindPopup(`<b>${icon} ${name}</b><br>${type.toUpperCase()}`);
             window.serviceMarkers.push(marker);
 
             return {
                 name,
-                type: type.replace('_', ' '),
-                dist: calcDist(lat, lon, elLat, elLon).toFixed(1) + "km",
+                type: type.replace(/_/g, ' '),
+                dist: calcDist(lat, lon, elLat, elLon),
                 icon
             };
-        });
+        }).filter(s => s !== null);
 
-        services.sort((a, b) => parseFloat(a.dist) - parseFloat(b.dist));
+        services.sort((a, b) => a.dist - b.dist);
 
         container.innerHTML = services.map(s => `
             <div class="service-card" style="display: flex; align-items: center; background: rgba(255,255,255,0.05); padding: 10px; border-radius: 8px; margin-bottom: 8px; border: 1px solid rgba(255,255,255,0.1);">
                 <div style="font-size: 1.2rem; margin-right: 12px;">${s.icon}</div>
                 <div>
                     <div style="font-size: 0.85rem; font-weight: 600;">${s.name}</div>
-                    <div style="font-size: 0.7rem; color: #8b8ba3; text-transform: uppercase;">${s.type} • <span style="color:var(--online)">${s.dist}</span></div>
+                    <div style="font-size: 0.7rem; color: #8b8ba3; text-transform: uppercase;">${s.type} • <span style="color:var(--online)">${s.dist.toFixed(1)}km</span></div>
                 </div>
             </div>
         `).join('');
 
     } catch (e) {
-        console.error(e);
-        container.innerHTML = '<p style="text-align:center; color:#ef4444;">Geo-sync offline.</p>';
+        console.error("Geo-Intelligence Error:", e);
+        container.innerHTML = `
+            <div style="text-align:center; padding:1.5rem;">
+                <p style="color:#ef4444; font-size:0.8rem;">Intelligence link disrupted.</p>
+                <button onclick="findNearbyServices([${lat}, ${lon}])" class="btn btn--ghost btn--sm" style="margin-top:10px;">Retry Scan</button>
+            </div>`;
     }
 }
 
