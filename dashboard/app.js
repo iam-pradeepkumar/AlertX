@@ -2,13 +2,9 @@
  * AlertX | Professional Dashboard Logic
  */
 
-const getBaseUrl = () => {
-    const origin = window.location.origin;
-    const path = window.location.pathname.replace(/\/+$/, '');
-    const base = path.endsWith('/dashboard') ? path.slice(0, -10) : path;
-    return origin + base;
-};
-const API_BASE = getBaseUrl();
+// ── CORE UTILITIES ───────────────────────────────
+// Using relative paths for better compatibility with proxies (HuggingFace)
+const API_BASE = ""; 
 console.log("AlertX: System initialized at", API_BASE);
 
 // ── CORE UTILITIES ───────────────────────────────
