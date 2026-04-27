@@ -11,12 +11,33 @@ const getBaseUrl = () => {
 const API_BASE = getBaseUrl();
 console.log("AlertX: System initialized at", API_BASE);
 
+// ── CORE UTILITIES ───────────────────────────────
+
+function showToast(message, type = "info") {
+    const container = document.getElementById('toast-container');
+    if (!container) {
+        console.warn("AlertX: Toast container missing. Alerting instead:", message);
+        if (type === "error") alert(message);
+        return;
+    }
+
+    const toast = document.createElement('div');
+    toast.className = `toast toast--${type}`;
+    toast.textContent = message;
+    container.appendChild(toast);
+    
+    setTimeout(() => {
+        toast.style.opacity = '0';
+        toast.style.transform = 'translateX(50px) scale(0.9)';
+        toast.style.transition = 'all 0.4s ease';
+        setTimeout(() => toast.remove(), 400);
+    }, 4500);
+}
+
 // ── GLOBAL ERROR CATCHER ────────────────────────
 window.onerror = function(msg, url, line, col, error) {
     console.error("AlertX Frontend Error:", msg, "at", line, ":", col);
-    if (typeof showToast === 'function') {
-        showToast(`System Error: ${msg} (Line ${line})`, "error");
-    }
+    showToast(`System Error: ${msg} (Line ${line})`, "error");
     return false;
 };
 let token = localStorage.getItem('alertx_token');
@@ -917,29 +938,11 @@ async function stopFeed() {
     }
 }
 
-// ── ACTIONS ───────────────────────────────────────
-
-function showToast(message, type = "info") {
-    const container = document.getElementById('toast-container');
-    if (!container) return;
-
-    const toast = document.createElement('div');
-    toast.className = `toast toast--${type}`;
-    toast.textContent = message;
-    container.appendChild(toast);
-    
-    setTimeout(() => {
-        toast.style.opacity = '0';
-        toast.style.transform = 'translateX(50px) scale(0.9)';
-        toast.style.transition = 'all 0.4s ease';
-        setTimeout(() => toast.remove(), 400);
-    }, 4500);
-}
 
 // ── LISTENERS ────────────────────────────────────
 
-document.addEventListener('DOMContentLoaded', () => {
-    console.log("AlertX: DOM Content Loaded, initializing protocols...");
+function init() {
+    console.log("AlertX: Initializing tactical protocols...");
     if (token) showApp();
 
     const addListener = (id, event, fn) => {
@@ -1051,4 +1054,11 @@ document.addEventListener('DOMContentLoaded', () => {
     addListener('filter-type', 'onchange', () => {
         updateEvents();
     });
-});
+}
+
+// ── BOOTSTRAP ─────────────────────────────────────
+if (document.readyState === 'loading') {
+    document.addEventListener('DOMContentLoaded', init);
+} else {
+    init();
+}
