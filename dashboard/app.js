@@ -316,41 +316,21 @@ async function findNearbyServices(pos, radius = 10000) {
     const lat = pos[0];
     const lon = pos[1];
 
-    // Strictly search for Hospital, Police, and Fire Station
-    // Including name-based search to catch facilities like "Medical College" that function as hospitals
-    const query = `
-        [out:json][timeout:30];
-        (
-          node["amenity"~"police|hospital|clinic|fire_station|ambulance_station"](around:${radius},${lat},${lon});
-          way["amenity"~"police|hospital|clinic|fire_station|ambulance_station"](around:${radius},${lat},${lon});
-          relation["amenity"~"police|hospital|clinic|fire_station|ambulance_station"](around:${radius},${lat},${lon});
-          node["healthcare"~"hospital|clinic"](around:${radius},${lat},${lon});
-          way["healthcare"~"hospital|clinic"](around:${radius},${lat},${lon});
-          node["name"~"hospital|medical|clinic|police|fire",i](around:${radius},${lat},${lon});
-          way["name"~"hospital|medical|clinic|police|fire",i](around:${radius},${lat},${lon});
-        );
-        out center 100;
-    `;
+    // Using ArcGIS World Geocoding Service for more reliable and up-to-date POI detection
+    // Categories: Hospital, Police Station, Fire Station
+    const url = `https://geocode.arcgis.com/arcgis/rest/services/World/GeocodeServer/findAddressCandidates?category=Hospital,Police%20Station,Fire%20Station&maxLocations=50&location=${lon},${lat}&distance=${radius}&f=json&outFields=Name,Type`;
 
     try {
-        const controller = new AbortController();
-        const timeoutId = setTimeout(() => controller.abort(), 45000); 
-
-        const response = await fetch("https://overpass-api.de/api/interpreter", {
-            method: "POST",
-            body: query,
-            signal: controller.signal
-        });
+        const response = await fetch(url);
         
-        clearTimeout(timeoutId);
-
         if (!response.ok) {
             throw new Error(`Satellite Link Error: ${response.status}`);
         }
 
         const data = await response.json();
+        const candidates = data.candidates || [];
         
-        if (!data.elements || data.elements.length === 0) {
+        if (candidates.length === 0) {
             if (radius < 50000) {
                 return findNearbyServices(pos, radius + 20000);
             }
@@ -376,28 +356,30 @@ async function findNearbyServices(pos, radius = 10000) {
             return R * (2 * Math.atan2(Math.sqrt(a), Math.sqrt(1-a)));
         };
 
-        const services = data.elements.map(el => {
-            const elLat = el.lat || (el.center ? el.center.lat : null);
-            const elLon = el.lon || (el.center ? el.center.lon : null);
-            if (!elLat || !elLon) return null;
-
-            const tags = el.tags || {};
-            const type = (tags.amenity || tags.emergency || tags.healthcare || 'security').toLowerCase();
-            const name = tags.name || `${type.replace(/_/g, ' ').toUpperCase()} NODE`;
+        const services = candidates.map(c => {
+            const cLat = c.location.y;
+            const cLon = c.location.x;
+            const name = c.address;
+            const type = (c.attributes && c.attributes.Type) ? c.attributes.Type.toLowerCase() : "";
             
             let icon = '🛡️';
             let color = '#3b82f6'; 
             let category = 'security';
 
-            if (type === 'police' || name.toLowerCase().includes('police')) { 
+            // ArcGIS Category Mapping
+            if (name.toLowerCase().includes('police') || type.includes('police')) { 
                 icon = '🚓'; color = '#2563eb'; category = 'police';
-            } else if (type.includes('hospital') || type.includes('clinic') || type.includes('medical') || name.toLowerCase().includes('hospital') || name.toLowerCase().includes('medical') || name.toLowerCase().includes('clinic')) { 
+            } else if (name.toLowerCase().includes('hospital') || name.toLowerCase().includes('medical') || name.toLowerCase().includes('clinic') || type.includes('hospital') || type.includes('medical')) { 
                 icon = '🏥'; color = '#ef4444'; category = 'hospital';
-            } else if (type.includes('fire') || name.toLowerCase().includes('fire')) { 
+            } else if (name.toLowerCase().includes('fire') || type.includes('fire')) { 
                 icon = '🚒'; color = '#f97316'; category = 'fire';
             } else {
-                // Skip anything that doesn't match the 3 main categories
-                return null;
+                // If we can't determine the category but it's returned, default to hospital if it's medical-sounding
+                if (name.toLowerCase().includes('health') || name.toLowerCase().includes('centre')) {
+                    icon = '🏥'; color = '#ef4444'; category = 'hospital';
+                } else {
+                    return null;
+                }
             }
 
             const pulseIcon = L.divIcon({
@@ -410,7 +392,7 @@ async function findNearbyServices(pos, radius = 10000) {
                 iconAnchor: [20, 20]
             });
             
-            const marker = L.marker([elLat, elLon], { icon: pulseIcon }).addTo(map)
+            const marker = L.marker([cLat, cLon], { icon: pulseIcon }).addTo(map)
                 .bindPopup(`
                     <div style="font-family: 'Inter', sans-serif; min-width: 150px;">
                         <div style="font-weight: bold; font-size: 14px; margin-bottom: 4px;">${icon} ${name}</div>
@@ -422,7 +404,7 @@ async function findNearbyServices(pos, radius = 10000) {
             return {
                 name,
                 type: category.toUpperCase(),
-                dist: calcDist(lat, lon, elLat, elLon),
+                dist: calcDist(lat, lon, cLat, cLon),
                 icon,
                 color
             };
