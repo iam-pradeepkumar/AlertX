@@ -316,24 +316,25 @@ async function findNearbyServices(pos, radius = 10000) {
     const lat = pos[0];
     const lon = pos[1];
 
-    // Broaden search to include more emergency-related tags and relations, and increase limit
+    // Strictly search for Hospital, Police, and Fire Station
+    // Including name-based search to catch facilities like "Medical College" that function as hospitals
     const query = `
         [out:json][timeout:30];
         (
-          node["amenity"~"police|hospital|clinic|fire_station|ambulance_station|doctor|pharmacy|college|university"](around:${radius},${lat},${lon});
-          way["amenity"~"police|hospital|clinic|fire_station|ambulance_station|college|university"](around:${radius},${lat},${lon});
-          relation["amenity"~"police|hospital|clinic|fire_station|ambulance_station|college|university"](around:${radius},${lat},${lon});
-          node["healthcare"](around:${radius},${lat},${lon});
-          way["healthcare"](around:${radius},${lat},${lon});
-          relation["healthcare"](around:${radius},${lat},${lon});
-          node["emergency"](around:${radius},${lat},${lon});
+          node["amenity"~"police|hospital|clinic|fire_station|ambulance_station"](around:${radius},${lat},${lon});
+          way["amenity"~"police|hospital|clinic|fire_station|ambulance_station"](around:${radius},${lat},${lon});
+          relation["amenity"~"police|hospital|clinic|fire_station|ambulance_station"](around:${radius},${lat},${lon});
+          node["healthcare"~"hospital|clinic"](around:${radius},${lat},${lon});
+          way["healthcare"~"hospital|clinic"](around:${radius},${lat},${lon});
+          node["name"~"hospital|medical|clinic|police|fire",i](around:${radius},${lat},${lon});
+          way["name"~"hospital|medical|clinic|police|fire",i](around:${radius},${lat},${lon});
         );
         out center 100;
     `;
 
     try {
         const controller = new AbortController();
-        const timeoutId = setTimeout(() => controller.abort(), 45000); // 45s timeout
+        const timeoutId = setTimeout(() => controller.abort(), 45000); 
 
         const response = await fetch("https://overpass-api.de/api/interpreter", {
             method: "POST",
@@ -344,22 +345,19 @@ async function findNearbyServices(pos, radius = 10000) {
         clearTimeout(timeoutId);
 
         if (!response.ok) {
-            if (response.status === 429) throw new Error("Intelligence server busy. Retrying...");
             throw new Error(`Satellite Link Error: ${response.status}`);
         }
 
         const data = await response.json();
         
         if (!data.elements || data.elements.length === 0) {
-            if (radius < 40000) {
-                console.log(`No verified assets in ${radius}m, deep scanning...`);
-                return findNearbyServices(pos, radius + 15000);
+            if (radius < 50000) {
+                return findNearbyServices(pos, radius + 20000);
             }
             container.innerHTML = `
                 <div style="text-align:center; padding:2rem; border: 1px dashed rgba(255,255,255,0.1); border-radius: 12px; background: rgba(0,0,0,0.2);">
                     <div style="font-size: 2rem; margin-bottom: 1rem; opacity: 0.5;">📡</div>
-                    <p style="color:#8b8ba3; font-size:0.85rem; line-height: 1.4;">No tactical assets detected in current sector (40km sweep).</p>
-                    <button onclick="findNearbyServices([${lat}, ${lon}])" class="btn btn--ghost btn--sm" style="margin-top:1rem; border-color: rgba(255,255,255,0.2);">Force Deep Scan</button>
+                    <p style="color:#8b8ba3; font-size:0.85rem; line-height: 1.4;">No emergency units detected in current sector.</p>
                 </div>`;
             return;
         }
@@ -384,18 +382,24 @@ async function findNearbyServices(pos, radius = 10000) {
             if (!elLat || !elLon) return null;
 
             const tags = el.tags || {};
-            const type = tags.amenity || tags.emergency || tags.office || 'security';
+            const type = (tags.amenity || tags.emergency || tags.healthcare || 'security').toLowerCase();
             const name = tags.name || `${type.replace(/_/g, ' ').toUpperCase()} NODE`;
             
             let icon = '🛡️';
-            let color = '#3b82f6'; // Blue
-            if (type === 'police') { icon = '🚓'; color = '#2563eb'; }
-            if (type.includes('hospital') || type.includes('ambulance') || type.includes('clinic') || type.includes('healthcare')) { icon = '🏥'; color = '#ef4444'; }
-            if (type === 'fire_station') { icon = '🚒'; color = '#f97316'; }
-            if (type === 'doctor' || type === 'pharmacy') { icon = '⚕️'; color = '#10b981'; }
-            if (type.includes('college') || type.includes('university')) { icon = '🎓'; color = '#8b5cf6'; }
+            let color = '#3b82f6'; 
+            let category = 'security';
 
-            // Tactical Pulse Marker
+            if (type === 'police' || name.toLowerCase().includes('police')) { 
+                icon = '🚓'; color = '#2563eb'; category = 'police';
+            } else if (type.includes('hospital') || type.includes('clinic') || type.includes('medical') || name.toLowerCase().includes('hospital') || name.toLowerCase().includes('medical') || name.toLowerCase().includes('clinic')) { 
+                icon = '🏥'; color = '#ef4444'; category = 'hospital';
+            } else if (type.includes('fire') || name.toLowerCase().includes('fire')) { 
+                icon = '🚒'; color = '#f97316'; category = 'fire';
+            } else {
+                // Skip anything that doesn't match the 3 main categories
+                return null;
+            }
+
             const pulseIcon = L.divIcon({
                 className: 'tactical-marker',
                 html: `
@@ -417,7 +421,7 @@ async function findNearbyServices(pos, radius = 10000) {
 
             return {
                 name,
-                type: type.replace(/_/g, ' '),
+                type: category.toUpperCase(),
                 dist: calcDist(lat, lon, elLat, elLon),
                 icon,
                 color
