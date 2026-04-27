@@ -222,27 +222,27 @@ function initMap() {
     
     map = L.map('map').setView(userPos, 13);
     
-    // Layer: High-Res Satellite
-    const satellite = L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}', {
-        attribution: 'Tiles &copy; Esri'
+    // Layer: Google Maps Standard
+    const googleStreets = L.tileLayer('http://mt0.google.com/vt/lyrs=m&hl=en&x={x}&y={y}&z={z}', {
+        attribution: '&copy; Google Maps'
     });
 
-    // Layer: Professional Dark Tactical
+    // Layer: Google Satellite Hybrid
+    const googleHybrid = L.tileLayer('http://mt0.google.com/vt/lyrs=y&hl=en&x={x}&y={y}&z={z}', {
+        attribution: '&copy; Google Maps'
+    });
+
+    // Layer: Professional Dark Tactical (CartoDB)
     const darkTactical = L.tileLayer('https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png', {
         attribution: '&copy; CartoDB'
     });
 
-    // Layer: Standard OpenStreetMap
-    const osmMap = L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
-        attribution: '&copy; OpenStreetMap contributors'
-    });
-
-    // Default: OSM Map
-    osmMap.addTo(map);
+    // Default: Google Streets
+    googleStreets.addTo(map);
 
     L.control.layers({
-        "🗺️ Standard Map": osmMap,
-        "🛰️ Satellite": satellite,
+        "🗺️ Google Streets": googleStreets,
+        "🛰️ Google Hybrid": googleHybrid,
         "🕶️ Dark Tactical": darkTactical
     }, {}, { position: 'topright' }).addTo(map);
 
