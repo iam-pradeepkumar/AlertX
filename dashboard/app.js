@@ -966,17 +966,6 @@ function init() {
         );
     });
 
-    const signupRole = document.getElementById('signup-role');
-    if (signupRole) {
-        signupRole.onchange = (e) => {
-            const badgeGroup = document.getElementById('badge-group');
-            if (badgeGroup) {
-                if (e.target.value === 'official') badgeGroup.classList.remove('hidden');
-                else badgeGroup.classList.add('hidden');
-            }
-        };
-    }
-
     addListener('show-signup', 'onclick', (e) => {
         e.preventDefault();
         console.log("AlertX: Switching to Registration Overlay");
