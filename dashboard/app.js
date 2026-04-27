@@ -45,6 +45,14 @@ async function loginWithGoogle() {
         showToast("Firebase Auth SDK not loaded or initialized.", "error");
         return;
     }
+    
+    // Check if the user has replaced the placeholder config
+    if (firebaseConfig.apiKey === "YOUR_API_KEY") {
+        alert("ACTION REQUIRED:\n\nPlease open dashboard/app.js and replace the 'firebaseConfig' (around line 27) with your actual Firebase project settings.\n\nGoogle Authentication cannot work until you provide your own API key.");
+        showToast("Missing Firebase Configuration", "error");
+        return;
+    }
+
     const provider = new firebase.auth.GoogleAuthProvider();
     try {
         const result = await firebaseAuth.signInWithPopup(provider);
