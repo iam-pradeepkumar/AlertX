@@ -612,7 +612,7 @@ async function startFeed() {
 
     // ── STRATEGY 1: Try server-side camera (works locally or with remote URL) ──
     const source = document.getElementById('cam-source').value.trim();
-    if (source && source !== "0") {
+    if (source !== "") {
         try {
             console.log(`AlertX: Attempting to start camera with source: ${source}`);
             await apiRequest(`/camera/start?source=${encodeURIComponent(source)}`, 'POST', null, true);
