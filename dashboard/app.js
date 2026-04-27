@@ -939,15 +939,21 @@ function showToast(message, type = "info") {
 // ── LISTENERS ────────────────────────────────────
 
 document.addEventListener('DOMContentLoaded', () => {
+    console.log("AlertX: DOM Content Loaded, initializing protocols...");
     if (token) showApp();
 
-    document.getElementById('login-form').onsubmit = (e) => {
+    const addListener = (id, event, fn) => {
+        const el = document.getElementById(id);
+        if (el) el[event] = fn;
+    };
+
+    addListener('login-form', 'onsubmit', (e) => {
         e.preventDefault();
         console.log("AlertX: Login trigger initiated");
         login(document.getElementById('login-user').value, document.getElementById('login-pass').value);
-    };
+    });
 
-    document.getElementById('signup-form').onsubmit = (e) => {
+    addListener('signup-form', 'onsubmit', (e) => {
         e.preventDefault();
         console.log("AlertX: Signup trigger initiated");
         signup(
@@ -957,31 +963,35 @@ document.addEventListener('DOMContentLoaded', () => {
             document.getElementById('signup-role').value,
             document.getElementById('signup-badge').value
         );
-    };
+    });
 
     const signupRole = document.getElementById('signup-role');
     if (signupRole) {
         signupRole.onchange = (e) => {
             const badgeGroup = document.getElementById('badge-group');
-            if (e.target.value === 'official') badgeGroup.classList.remove('hidden');
-            else badgeGroup.classList.add('hidden');
+            if (badgeGroup) {
+                if (e.target.value === 'official') badgeGroup.classList.remove('hidden');
+                else badgeGroup.classList.add('hidden');
+            }
         };
     }
 
-    document.getElementById('show-signup').onclick = (e) => {
+    addListener('show-signup', 'onclick', (e) => {
         e.preventDefault();
+        console.log("AlertX: Switching to Registration Overlay");
         switchOverlay('signup-overlay');
-    };
+    });
 
-    document.getElementById('show-login').onclick = (e) => {
+    addListener('show-login', 'onclick', (e) => {
         e.preventDefault();
+        console.log("AlertX: Switching to Login Overlay");
         switchOverlay('auth-overlay');
-    };
+    });
 
-    document.getElementById('btn-logout').onclick = (e) => {
+    addListener('btn-logout', 'onclick', (e) => {
         e.preventDefault();
         logout();
-    };
+    });
 
     document.querySelectorAll('.nav-item').forEach(btn => {
         btn.onclick = (e) => {
@@ -991,55 +1001,54 @@ document.addEventListener('DOMContentLoaded', () => {
     });
 
     // Hamburger menu (mobile)
-    const hamburgerBtn = document.getElementById('hamburger-btn');
-    const sidebarBackdrop = document.getElementById('sidebar-backdrop');
-    if (hamburgerBtn) hamburgerBtn.onclick = toggleSidebar;
-    if (sidebarBackdrop) sidebarBackdrop.onclick = closeSidebar;
+    addListener('hamburger-btn', 'onclick', toggleSidebar);
+    addListener('sidebar-backdrop', 'onclick', closeSidebar);
 
-    document.getElementById('btn-start').onclick = startFeed;
-    document.getElementById('btn-stop').onclick = stopFeed;
+    addListener('btn-start', 'onclick', startFeed);
+    addListener('btn-stop', 'onclick', stopFeed);
 
-    document.getElementById('btn-apply-source').onclick = () => {
-        const source = document.getElementById('cam-source').value;
-        showToast(`Vision source configured: ${source}`, "success");
-        if (isLive) {
-            showToast("Restart Node to apply new vision source", "info");
+    addListener('btn-apply-source', 'onclick', () => {
+        const el = document.getElementById('cam-source');
+        if (el) {
+            const source = el.value;
+            showToast(`Vision source configured: ${source}`, "success");
+            if (isLive) showToast("Restart Node to apply new vision source", "info");
         }
-    };
+    });
 
     // Upload interaction
     const zone = document.getElementById('upload-zone');
     const input = document.getElementById('file-input');
-    
-    zone.onclick = () => input.click();
-    input.onchange = (e) => handleUpload(e.target.files[0]);
-    
-    zone.ondragover = (e) => { e.preventDefault(); zone.classList.add('dragover'); };
-    zone.ondragleave = () => zone.classList.remove('dragover');
-    zone.ondrop = (e) => {
-        e.preventDefault();
-        zone.classList.remove('dragover');
-        handleUpload(e.dataTransfer.files[0]);
-    };
+    if (zone && input) {
+        zone.onclick = () => input.click();
+        input.onchange = (e) => handleUpload(e.target.files[0]);
+        zone.ondragover = (e) => { e.preventDefault(); zone.classList.add('dragover'); };
+        zone.ondragleave = () => zone.classList.remove('dragover');
+        zone.ondrop = (e) => {
+            e.preventDefault();
+            zone.classList.remove('dragover');
+            handleUpload(e.dataTransfer.files[0]);
+        };
+    }
 
     // Dispatch buttons logic
     document.querySelectorAll('.dispatch-btn').forEach(btn => {
         btn.onclick = () => {
             const service = btn.dataset.service;
-            fetch(`/dispatch/${service}`)
+            fetch(`${API_BASE}/dispatch/${service}`)
                 .then(() => showToast(`AI Voice Agent contacted ${service.toUpperCase()}`, "success"))
                 .catch(() => showToast("Emergency Protocol Error: AI Agent unreachable", "error"));
         };
     });
 
-    // New functional listeners
-    document.getElementById('btn-refresh-stats').onclick = () => {
+    // Optional UI listeners (will not crash if missing)
+    addListener('btn-refresh-stats', 'onclick', () => {
         updateStatus();
         updateEvents();
         showToast("System data synchronized", "info");
-    };
+    });
 
-    document.getElementById('filter-type').onchange = () => {
+    addListener('filter-type', 'onchange', () => {
         updateEvents();
-    };
+    });
 });
