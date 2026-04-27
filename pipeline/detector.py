@@ -73,6 +73,9 @@ class AlertXEnsemble:
             import torch
             from ultralytics import YOLO
             
+            # Use GPU if possible
+            device = "cuda" if torch.cuda.is_available() else "cpu"
+            
             # ─────────────────────────────────────────────────────────
             # FIX: PyTorch 2.6+ security change (Weights only load failed)
             # Temporary monkeypatch to allow loading official YOLO weights
@@ -92,33 +95,29 @@ class AlertXEnsemble:
             logger.error(f"Failed to load YOLO model: {e}")
             raise
 
-    def detect(self, frame: np.ndarray, imgsz: int = 320, annotate: bool = True) -> FrameResult:
+    def detect(self, frame: np.ndarray, imgsz: int = 640, annotate: bool = True) -> FrameResult:
         if not self._loaded:
             self.load()
 
         result = FrameResult()
         t0 = time.time()
         
-        # PERF: Internal downscale for ultra-fast CPU inference
-        h, w = frame.shape[:2]
-        if w > 320:
-            scale = 320 / w
-            proc_frame = cv2.resize(frame, (320, int(h * scale)), interpolation=cv2.INTER_NEAREST)
-        else:
-            proc_frame = frame
-
+        # Optimization: Use GPU if available
+        device = "cuda" if torch.cuda.is_available() else "cpu"
+        
         if annotate:
             result.raw_frame = frame.copy()
         
         self._frame_count += 1
 
         # 1. CORE YOLO INFERENCE (Ensemble Base)
+        # Upgraded to imgsz=640 for significantly better accuracy on small objects/weapons
         results = self._model(
-            proc_frame,
+            frame,
             conf=YOLO_CONF_THRESHOLD,
             iou=YOLO_IOU_THRESHOLD,
             verbose=False,
-            device="cpu",
+            device=device,
             imgsz=imgsz,
         )
 
@@ -139,14 +138,8 @@ class AlertXEnsemble:
             conf = float(box.conf[0])
             class_name = names.get(cls_id, "unknown")
             
-            # Rescale bbox back to original frame size
-            b = box.xyxy[0].tolist()
-            bbox = (
-                b[0] * orig_w / proc_w,
-                b[1] * orig_h / proc_h,
-                b[2] * orig_w / proc_w,
-                b[3] * orig_h / proc_h
-            )
+            # Bbox is already at original frame scale since we didn't resize 'frame'
+            bbox = box.xyxy[0].tolist()
             
             incident_type = INCIDENT_CLASS_MAP.get(class_name, "")
             if conf < 0.35: continue 

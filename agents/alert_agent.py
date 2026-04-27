@@ -13,7 +13,11 @@ from typing import Any, Dict
 from agents.base_agent import BaseAgent
 from backend.config import ALERT_COOLDOWN
 from backend.event_store import Event, EventStore
-from utils.email_service import send_email
+# Email service removed (Google related). 
+# To re-enable alerts, integrate with a new provider (e.g. SendGrid or SMTP).
+def send_email(*args, **kwargs):
+    logger.warning("📧 Email Alert suppressed (Google Service Removed).")
+    return True
 from utils.image_host import upload_frame
 # Import for updating global context
 import backend.main as main_module

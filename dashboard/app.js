@@ -22,53 +22,7 @@ let browserCamInterval = null; // Interval for frame capture loop
 let isBrowserCamMode = false;  // True when using browser webcam fallback
 
 // ── AUTHENTICATION ────────────────────────────────
-
-// ── FIREBASE CONFIGURATION (Replace with your own config) ──
-const firebaseConfig = {
-    apiKey: "YOUR_API_KEY",
-    authDomain: "YOUR_PROJECT_ID.firebaseapp.com",
-    projectId: "YOUR_PROJECT_ID",
-    storageBucket: "YOUR_PROJECT_ID.appspot.com",
-    messagingSenderId: "YOUR_SENDER_ID",
-    appId: "YOUR_APP_ID"
-};
-
-// Initialize Firebase (Only if SDK is loaded)
-let firebaseAuth;
-if (typeof firebase !== 'undefined') {
-    firebase.initializeApp(firebaseConfig);
-    firebaseAuth = firebase.auth();
-}
-
-async function loginWithGoogle() {
-    if (!firebaseAuth) {
-        showToast("Firebase Auth SDK not loaded or initialized.", "error");
-        return;
-    }
-    
-    // Check if the user has replaced the placeholder config
-    if (firebaseConfig.apiKey === "YOUR_API_KEY") {
-        alert("ACTION REQUIRED:\n\nPlease open dashboard/app.js and replace the 'firebaseConfig' (around line 27) with your actual Firebase project settings.\n\nGoogle Authentication cannot work until you provide your own API key.");
-        showToast("Missing Firebase Configuration", "error");
-        return;
-    }
-
-    const provider = new firebase.auth.GoogleAuthProvider();
-    try {
-        const result = await firebaseAuth.signInWithPopup(provider);
-        const idToken = await result.user.getIdToken();
-        
-        // Send Firebase token to our backend for verification and get our local JWT
-        const data = await apiRequest('/auth/google', 'POST', { id_token: idToken });
-        token = data.access_token;
-        localStorage.setItem('alertx_token', token);
-        showApp();
-        showToast("Google Sign-In successful. Welcome Commander.", "success");
-    } catch (err) {
-        console.error("Google Auth Error:", err);
-        showToast(`Google Sign-In Failed: ${err.message}`, "error");
-    }
-}
+// Google Auth removed. Using local authentication only.
 async function apiRequest(endpoint, method = 'GET', body = null, isForm = false) {
     const headers = {};
     if (token) {

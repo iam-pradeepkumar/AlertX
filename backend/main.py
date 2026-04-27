@@ -35,7 +35,6 @@ from backend.auth import (
     get_current_user
 )
 from backend.models import get_db, User, Event, SQLALCHEMY_DATABASE_URL
-from utils.firebase_service import init_firebase, get_firestore
 from backend.config import (
     BASE_DIR,
     UPLOAD_DIR,
@@ -76,7 +75,6 @@ app = FastAPI(
     version="1.0.0",
     description="Real-time incident detection from live CCTV and uploaded video.",
 )
-init_firebase() # Start Firebase
 
 app.add_middleware(
     CORSMiddleware,
@@ -203,31 +201,6 @@ async def login(form_data: OAuth2PasswordRequestForm = Depends(), db = Depends(g
     access_token = create_access_token(data={"sub": user_data["username"]})
     return {"access_token": access_token, "token_type": "bearer"}
 
-class FirebaseTokenRequest(BaseModel):
-    id_token: str
-
-@app.post("/auth/google")
-async def google_login(request: FirebaseTokenRequest, db = Depends(get_db)):
-    """Verify Firebase ID token and login/register the user."""
-    from firebase_admin import auth as firebase_auth
-    try:
-        decoded_token = firebase_auth.verify_id_token(request.id_token)
-        email = decoded_token.get("email")
-        uid = decoded_token.get("uid")
-        
-        if not email:
-            raise HTTPException(status_code=400, detail="Google account has no email")
-            
-        user_data = db.get_user(email)
-        if not user_data:
-            hashed_password = get_password_hash(uid)
-            db.save_user(username=email, email=email, hashed_password=hashed_password, role="civilian", badge_id="")
-        
-        access_token = create_access_token(data={"sub": email})
-        return {"access_token": access_token, "token_type": "bearer"}
-    except Exception as e:
-        logger.error(f"Google Auth Error: {e}")
-        raise HTTPException(status_code=401, detail="Invalid Firebase Token")
 
 from fastapi.responses import StreamingResponse, JSONResponse, HTMLResponse, FileResponse
 
@@ -572,7 +545,7 @@ async def system_status(current_user: str = Depends(get_current_user)):
         "is_incident_active": _is_processing_incident,
         "model_loaded": detector.is_loaded,
         "alert_recipient": _alert_recipient,
-        "db_mode": "Cloud (Firebase)",
+        "db_mode": "Local Storage (Secure)",
         "last_sync": datetime.now().isoformat(),
         "agents": {
             "detection": detection_agent.stats,
@@ -636,15 +609,13 @@ async def process_frame(file: UploadFile = File(...), current_user: str = Depend
     
     # PERF: Downscale large frames to 320px wide before detection
     h, w = frame.shape[:2]
-    max_w = 320
+    max_w = 640
     if w > max_w:
         scale = max_w / w
         frame = cv2.resize(frame, (max_w, int(h * scale)), interpolation=cv2.INTER_NEAREST)
         
-    # PERF: Use imgsz=320 + annotate=False for ~4x faster inference
-    # - imgsz=320 prevents YOLO from upscaling 320px frame to 640px internally
-    # - annotate=False skips frame.copy() and all cv2 drawing calls
-    result = detector.detect(frame, imgsz=320, annotate=False)
+    # PERF: Use imgsz=640 + annotate=False for high-accuracy fast inference
+    result = detector.detect(frame, imgsz=640, annotate=False)
     
     if result.incidents:
         run_agent_pipeline(result, source="browser_cam")
