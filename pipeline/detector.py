@@ -11,6 +11,7 @@ from typing import List, Optional
 
 import cv2
 import numpy as np
+import torch
 
 from backend.config import (
     YOLO_MODEL,
@@ -70,7 +71,6 @@ class AlertXEnsemble:
         if self._loaded:
             return
         try:
-            import torch
             from ultralytics import YOLO
             
             # Use GPU if possible
@@ -127,11 +127,9 @@ class AlertXEnsemble:
             result.annotated_frame = frame
             return result
 
-        # 2. OBJECT EXTRACTION
+        # Object Extraction
         r = results[0]
         names = r.names
-        orig_h, orig_w = frame.shape[:2]
-        proc_h, proc_w = proc_frame.shape[:2]
         
         for box in r.boxes:
             cls_id = int(box.cls[0])
