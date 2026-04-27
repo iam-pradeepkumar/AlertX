@@ -193,16 +193,31 @@ function initMap() {
     
     map = L.map('map').setView(userPos, 13);
     
-    // Real Satellite View (Esri World Imagery)
-    L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}', {
-        attribution: 'Tiles &copy; Esri &mdash; Source: Esri, i-cubed, USDA, USGS, AEX, GeoEye, Getmapping, Aerogrid, IGN, IGP, UPR-EBP, and the GIS User Community'
-    }).addTo(map);
+    // Layer: High-Res Satellite
+    const satellite = L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}', {
+        attribution: 'Tiles &copy; Esri'
+    });
 
-    // Overlay for labels (OpenStreetMap Hybrid)
-    L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
-        opacity: 0.5,
+    // Layer: Professional Dark Tactical
+    const darkTactical = L.tileLayer('https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png', {
+        attribution: '&copy; CartoDB'
+    });
+
+    // Default: Satellite
+    satellite.addTo(map);
+
+    // Overlay for labels (Hybrid View)
+    const labels = L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+        opacity: 0.4,
         className: 'map-labels-overlay'
     }).addTo(map);
+
+    L.control.layers({
+        "🛰️ Satellite": satellite,
+        "🕶️ Dark Tactical": darkTactical
+    }, {
+        "🏷️ Labels": labels
+    }, { position: 'topright' }).addTo(map);
 
     window.serviceMarkers = [];
 
@@ -215,7 +230,22 @@ function initMap() {
     const applyLocation = (lat, lon) => {
         userPos = [lat, lon];
         map.setView(userPos, 14);
-        L.marker(userPos).addTo(map).bindPopup("Active Security Node").openPopup();
+        
+        // Tactical Pulse Marker for Main Node
+        const mainNodeIcon = L.divIcon({
+            className: 'tactical-marker',
+            html: `
+                <div class="marker-pulse" style="background: #6366f1; width: 60px; height: 60px; left: -10px; top: -10px;"></div>
+                <div class="marker-inner" style="background: #6366f1; width: 40px; height: 40px;">🛸</div>
+            `,
+            iconSize: [40, 40],
+            iconAnchor: [20, 20]
+        });
+
+        L.marker(userPos, { icon: mainNodeIcon }).addTo(map)
+            .bindPopup(`<div style="font-weight:bold; color:#6366f1;">ACTIVE SECURITY NODE</div><div style="font-size:10px; opacity:0.7;">LAT: ${lat.toFixed(4)} | LON: ${lon.toFixed(4)}</div>`)
+            .openPopup();
+            
         findNearbyServices(userPos);
     };
 
@@ -272,7 +302,7 @@ async function findNearbyServices(pos, radius = 10000) {
 
     try {
         const controller = new AbortController();
-        const timeoutId = setTimeout(() => controller.abort(), 35000); // 35s timeout
+        const timeoutId = setTimeout(() => controller.abort(), 45000); // 45s timeout
 
         const response = await fetch("https://overpass-api.de/api/interpreter", {
             method: "POST",
@@ -283,22 +313,22 @@ async function findNearbyServices(pos, radius = 10000) {
         clearTimeout(timeoutId);
 
         if (!response.ok) {
-            if (response.status === 429) throw new Error("Server busy. Retrying...");
-            throw new Error(`Overpass API Error: ${response.status}`);
+            if (response.status === 429) throw new Error("Intelligence server busy. Retrying...");
+            throw new Error(`Satellite Link Error: ${response.status}`);
         }
 
         const data = await response.json();
         
         if (!data.elements || data.elements.length === 0) {
-            if (radius < 30000) {
-                // Try broader search if nothing found
-                console.log(`No units in ${radius}m, expanding search...`);
-                return findNearbyServices(pos, radius + 10000);
+            if (radius < 40000) {
+                console.log(`No verified assets in ${radius}m, deep scanning...`);
+                return findNearbyServices(pos, radius + 15000);
             }
             container.innerHTML = `
-                <div style="text-align:center; padding:1.5rem;">
-                    <p style="color:#8b8ba3; font-size:0.8rem;">No verified units detected in this sector (30km scan).</p>
-                    <button onclick="findNearbyServices([${lat}, ${lon}])" class="btn btn--ghost btn--sm" style="margin-top:10px;">Deep Scan</button>
+                <div style="text-align:center; padding:2rem; border: 1px dashed rgba(255,255,255,0.1); border-radius: 12px; background: rgba(0,0,0,0.2);">
+                    <div style="font-size: 2rem; margin-bottom: 1rem; opacity: 0.5;">📡</div>
+                    <p style="color:#8b8ba3; font-size:0.85rem; line-height: 1.4;">No tactical assets detected in current sector (40km sweep).</p>
+                    <button onclick="findNearbyServices([${lat}, ${lon}])" class="btn btn--ghost btn--sm" style="margin-top:1rem; border-color: rgba(255,255,255,0.2);">Force Deep Scan</button>
                 </div>`;
             return;
         }
@@ -322,54 +352,74 @@ async function findNearbyServices(pos, radius = 10000) {
             const elLon = el.lon || (el.center ? el.center.lon : null);
             if (!elLat || !elLon) return null;
 
-            const type = el.tags.amenity || el.tags.emergency || 'emergency';
-            const name = el.tags.name || `Unit: ${type.replace(/_/g, ' ').toUpperCase()}`;
+            const tags = el.tags || {};
+            const type = tags.amenity || tags.emergency || tags.office || 'security';
+            const name = tags.name || `${type.replace(/_/g, ' ').toUpperCase()} NODE`;
             
             let icon = '🛡️';
-            if (type === 'police') icon = '🚓';
-            if (type.includes('hospital') || type.includes('ambulance')) icon = '🏥';
-            if (type === 'fire_station') icon = '🚒';
-            if (type === 'doctor' || type === 'pharmacy') icon = '⚕️';
+            let color = '#3b82f6'; // Blue
+            if (type === 'police') { icon = '🚓'; color = '#2563eb'; }
+            if (type.includes('hospital') || type.includes('ambulance')) { icon = '🏥'; color = '#ef4444'; }
+            if (type === 'fire_station') { icon = '🚒'; color = '#f97316'; }
+            if (type === 'doctor' || type === 'pharmacy') { icon = '⚕️'; color = '#10b981'; }
 
-            const customIcon = L.divIcon({
-                className: '',
-                html: `<div style="font-size: 24px; filter: drop-shadow(0 2px 4px rgba(0,0,0,0.5));">${icon}</div>`,
-                iconSize: [30, 30],
-                iconAnchor: [15, 15]
+            // Tactical Pulse Marker
+            const pulseIcon = L.divIcon({
+                className: 'tactical-marker',
+                html: `
+                    <div class="marker-pulse" style="background: ${color}"></div>
+                    <div class="marker-inner" style="background: ${color}">${icon}</div>
+                `,
+                iconSize: [40, 40],
+                iconAnchor: [20, 20]
             });
             
-            const marker = L.marker([elLat, elLon], { icon: customIcon }).addTo(map)
-                .bindPopup(`<b>${icon} ${name}</b><br>${type.toUpperCase()}`);
+            const marker = L.marker([elLat, elLon], { icon: pulseIcon }).addTo(map)
+                .bindPopup(`
+                    <div style="font-family: 'Inter', sans-serif; min-width: 150px;">
+                        <div style="font-weight: bold; font-size: 14px; margin-bottom: 4px;">${icon} ${name}</div>
+                        <div style="font-size: 10px; text-transform: uppercase; color: #666; letter-spacing: 1px;">Verified Tactical Node</div>
+                    </div>
+                `);
             window.serviceMarkers.push(marker);
 
             return {
                 name,
                 type: type.replace(/_/g, ' '),
                 dist: calcDist(lat, lon, elLat, elLon),
-                icon
+                icon,
+                color
             };
         }).filter(s => s !== null);
 
         services.sort((a, b) => a.dist - b.dist);
 
         container.innerHTML = services.map(s => `
-            <div class="service-card" style="display: flex; align-items: center; background: rgba(255,255,255,0.05); padding: 10px; border-radius: 8px; margin-bottom: 8px; border: 1px solid rgba(255,255,255,0.1);">
-                <div style="font-size: 1.2rem; margin-right: 12px;">${s.icon}</div>
-                <div>
-                    <div style="font-size: 0.85rem; font-weight: 600;">${s.name}</div>
-                    <div style="font-size: 0.7rem; color: #8b8ba3; text-transform: uppercase;">${s.type} • <span style="color:var(--online)">${s.dist.toFixed(1)}km</span></div>
+            <div class="service-card tactical-card" style="border-left: 4px solid ${s.color};">
+                <div class="tactical-card__icon">${s.icon}</div>
+                <div class="tactical-card__info">
+                    <div class="tactical-card__name">${s.name}</div>
+                    <div class="tactical-card__meta">
+                        <span class="tactical-card__type">${s.type}</span>
+                        <span class="tactical-card__dist">${s.dist.toFixed(1)} KM</span>
+                    </div>
+                </div>
+                <div class="tactical-card__status">
+                    <span class="pulse-dot"></span>
                 </div>
             </div>
         `).join('');
 
     } catch (e) {
-        console.error("Geo-Intelligence Error:", e);
+        console.error("Geo-Intelligence Link Failed:", e);
         container.innerHTML = `
-            <div style="text-align:center; padding:1.5rem;">
-                <p style="color:#ef4444; font-size:0.8rem;">Intelligence link disrupted.</p>
-                <button onclick="findNearbyServices([${lat}, ${lon}])" class="btn btn--ghost btn--sm" style="margin-top:10px;">Retry Scan</button>
+            <div style="text-align:center; padding:2rem; background: rgba(239, 68, 68, 0.05); border: 1px solid rgba(239, 68, 68, 0.2); border-radius: 12px;">
+                <p style="color:#ef4444; font-size:0.85rem; font-weight: 500;">Tactical Uplink Interrupted</p>
+                <p style="color:#8b8ba3; font-size:0.75rem; margin-top: 4px;">Check network or satellite coordinates.</p>
+                <button onclick="findNearbyServices([${lat}, ${lon}])" class="btn btn--ghost btn--sm" style="margin-top:1rem; border-color: rgba(239, 68, 68, 0.3); color: #ef4444;">Attempt Re-sync</button>
             </div>`;
     }
+}
 }
 
 // ── UPLOAD LOGIC ────────────────────────────────
