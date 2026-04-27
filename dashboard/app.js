@@ -141,7 +141,6 @@ function logout() {
     document.getElementById('app-shell').classList.add('hidden');
     document.getElementById('auth-overlay').classList.add('active');
     
-    showToast("Session terminated. Secure logout complete.", "info");
     isLoggingOut = false;
 }
 
@@ -930,7 +929,6 @@ async function stopFeed() {
         const badge = document.getElementById('node-status-badge');
         badge.textContent = "Standby";
         badge.className = "badge badge--offline";
-        showToast("Node Offline — Intelligence protocols suspended", "info");
     } catch (e) {
         showToast("Stop failed", "error");
     }
@@ -1001,8 +999,7 @@ function init() {
         const el = document.getElementById('cam-source');
         if (el) {
             const source = el.value;
-            showToast(`Vision source configured: ${source}`, "success");
-            if (isLive) showToast("Restart Node to apply new vision source", "info");
+            // Removed redundant toasts
         }
     });
 
@@ -1035,7 +1032,6 @@ function init() {
     addListener('btn-refresh-stats', 'onclick', () => {
         updateStatus();
         updateEvents();
-        showToast("System data synchronized", "info");
     });
 }
 
