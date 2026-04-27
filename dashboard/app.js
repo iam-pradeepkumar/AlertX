@@ -192,6 +192,9 @@ function switchView(viewName) {
     
     if (viewName === 'live-map') {
         initMap();
+        if (map) {
+            setTimeout(() => map.invalidateSize(), 100);
+        }
     } else if (viewName === 'history') {
         updateHistory();
     }
@@ -229,21 +232,19 @@ function initMap() {
         attribution: '&copy; CartoDB'
     });
 
-    // Default: Satellite
-    satellite.addTo(map);
+    // Layer: Standard OpenStreetMap
+    const osmMap = L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+        attribution: '&copy; OpenStreetMap contributors'
+    });
 
-    // Overlay for labels (Hybrid View)
-    const labels = L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
-        opacity: 0.4,
-        className: 'map-labels-overlay'
-    }).addTo(map);
+    // Default: OSM Map
+    osmMap.addTo(map);
 
     L.control.layers({
+        "🗺️ Standard Map": osmMap,
         "🛰️ Satellite": satellite,
         "🕶️ Dark Tactical": darkTactical
-    }, {
-        "🏷️ Labels": labels
-    }, { position: 'topright' }).addTo(map);
+    }, {}, { position: 'topright' }).addTo(map);
 
     window.serviceMarkers = [];
 

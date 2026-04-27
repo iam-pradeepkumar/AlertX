@@ -80,6 +80,8 @@ body {
     border: 1px solid var(--border);
     box-shadow: var(--shadow);
     text-align: center;
+    max-height: 90vh;
+    overflow-y: auto;
 }
 
 .auth-card .logo { margin-bottom: 2rem; justify-content: center; }
