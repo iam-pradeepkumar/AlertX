@@ -10,6 +10,15 @@ const getBaseUrl = () => {
 };
 const API_BASE = getBaseUrl();
 console.log("AlertX: System initialized at", API_BASE);
+
+// ── GLOBAL ERROR CATCHER ────────────────────────
+window.onerror = function(msg, url, line, col, error) {
+    console.error("AlertX Frontend Error:", msg, "at", line, ":", col);
+    if (typeof showToast === 'function') {
+        showToast(`System Error: ${msg} (Line ${line})`, "error");
+    }
+    return false;
+};
 let token = localStorage.getItem('alertx_token');
 let lastEventId = -1;
 let map = null;
@@ -934,11 +943,13 @@ document.addEventListener('DOMContentLoaded', () => {
 
     document.getElementById('login-form').onsubmit = (e) => {
         e.preventDefault();
+        console.log("AlertX: Login trigger initiated");
         login(document.getElementById('login-user').value, document.getElementById('login-pass').value);
     };
 
     document.getElementById('signup-form').onsubmit = (e) => {
         e.preventDefault();
+        console.log("AlertX: Signup trigger initiated");
         signup(
             document.getElementById('signup-user').value, 
             document.getElementById('signup-email').value, 
