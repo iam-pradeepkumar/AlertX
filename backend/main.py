@@ -203,6 +203,32 @@ async def login(form_data: OAuth2PasswordRequestForm = Depends(), db = Depends(g
     access_token = create_access_token(data={"sub": user_data["username"]})
     return {"access_token": access_token, "token_type": "bearer"}
 
+class FirebaseTokenRequest(BaseModel):
+    id_token: str
+
+@app.post("/auth/google")
+async def google_login(request: FirebaseTokenRequest, db = Depends(get_db)):
+    """Verify Firebase ID token and login/register the user."""
+    from firebase_admin import auth as firebase_auth
+    try:
+        decoded_token = firebase_auth.verify_id_token(request.id_token)
+        email = decoded_token.get("email")
+        uid = decoded_token.get("uid")
+        
+        if not email:
+            raise HTTPException(status_code=400, detail="Google account has no email")
+            
+        user_data = db.get_user(email)
+        if not user_data:
+            hashed_password = get_password_hash(uid)
+            db.save_user(username=email, email=email, hashed_password=hashed_password, role="civilian", badge_id="")
+        
+        access_token = create_access_token(data={"sub": email})
+        return {"access_token": access_token, "token_type": "bearer"}
+    except Exception as e:
+        logger.error(f"Google Auth Error: {e}")
+        raise HTTPException(status_code=401, detail="Invalid Firebase Token")
+
 from fastapi.responses import StreamingResponse, JSONResponse, HTMLResponse, FileResponse
 
 @app.get("/download/db")
