@@ -213,7 +213,9 @@ function initMap() {
         const timeEl = document.getElementById('live-sector-time');
         if (timeEl) {
             const now = new Date();
-            timeEl.innerHTML = `LIVE: ${now.toLocaleDateString()} ${now.toLocaleTimeString()}`;
+            const dateStr = now.toLocaleDateString([], { day: '2-digit', month: '2-digit' });
+            const timeStr = now.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' });
+            timeEl.innerHTML = `<span style="opacity: 0.6; font-size: 0.65rem;">SYNC</span> ${dateStr} ${timeStr}`;
         }
     }, 1000);
     
