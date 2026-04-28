@@ -14,3 +14,7 @@ logs/
 *.pt
 credentials.json
 get_gmail_token.py
+*.h5
+AI-model/venv310/
+!AI-model/*.pt
+!AI-model/*.h5
