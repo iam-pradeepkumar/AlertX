@@ -9,11 +9,21 @@ jobs:
   sync-to-hub:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v3
+      - uses: actions/checkout@v4
         with:
           fetch-depth: 0
           lfs: true
+
+      - name: Install and configure Git LFS
+        run: |
+          git lfs install
+          git lfs pull
+
       - name: Push to hub
         env:
           HF_TOKEN: ${{ secrets.HF_TOKEN }}
-        run: git push --force https://iam-pradeepkumar:$HF_TOKEN@huggingface.co/spaces/iam-pradeepkumar/AlertX main
+        run: |
+          git remote add hf https://iam-pradeepkumar:$HF_TOKEN@huggingface.co/spaces/iam-pradeepkumar/AlertX || true
+          git remote set-url hf https://iam-pradeepkumar:$HF_TOKEN@huggingface.co/spaces/iam-pradeepkumar/AlertX
+          git lfs push --all hf main || true
+          git push --force hf main
